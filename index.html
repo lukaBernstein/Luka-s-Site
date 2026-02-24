@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA | SMOOTH FLIP FIX</title>
+    <title>LUKA | RESTORED & REFINED</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -25,12 +25,13 @@
         const resumeTex = loader.load('resume_front.jpg'); 
         const backTex = loader.load('resume_back.jpg');
 
-        // --- MATH CONSTANTS (1275 x 1650) ---
+        // --- ASPECT RATIO MATH ---
+        // 1650 / 1275 = 1.2941
         const ROWS = 12;
         const COLS = 10;
-        const ASPECT_RATIO = 1.29411; 
-        const BASE_WIDTH = 1.2;
-        const BASE_HEIGHT = BASE_WIDTH * ASPECT_RATIO;
+        const ASPECT = 1.2941; 
+        const BASE_W = 1.2;
+        const BASE_H = BASE_W * ASPECT;
 
         function createTextTexture(text) {
             const canvas = document.createElement('canvas');
@@ -85,19 +86,19 @@
                 const uIdx = i % COLS;
                 const vIdx = Math.floor(i / COLS);
 
-                // Front Geometry
-                const geoF = new THREE.PlaneGeometry(BASE_WIDTH, BASE_HEIGHT);
+                // FRONT Side
+                const geoF = new THREE.PlaneGeometry(BASE_W, BASE_H);
                 const uvF = geoF.attributes.uv;
                 for (let j = 0; j < uvF.count; j++) {
                     uvF.setXY(j, (uvF.getX(j) + uIdx) / COLS, (uvF.getY(j) + vIdx) / ROWS);
                 }
                 const meshFront = new THREE.Mesh(geoF, new THREE.MeshStandardMaterial({ map: resumeTex, roughness: 0.3, metalness: 0.2 }));
 
-                // Back Geometry (Mirrored)
-                const geoB = new THREE.PlaneGeometry(BASE_WIDTH, BASE_HEIGHT);
+                // BACK Side (Mirrored sampling to prevent jumbled mess)
+                const geoB = new THREE.PlaneGeometry(BASE_W, BASE_H);
                 const uvB = geoB.attributes.uv;
                 for (let j = 0; j < uvB.count; j++) {
-                    const uBack = ( (1 - uvB.getX(j)) + (COLS - 1 - uIdx) ) / COLS;
+                    const uBack = ((1 - uvB.getX(j)) + (COLS - 1 - uIdx)) / COLS;
                     uvB.setXY(j, uBack, (uvB.getY(j) + vIdx) / ROWS);
                 }
                 const meshBack = new THREE.Mesh(geoB, new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.3, metalness: 0.2 }));
@@ -113,8 +114,8 @@
                 fragContainer.lookAt(0, 0, 0);
                 
                 fragContainer.userData = { 
-                    homeX: (uIdx - COLS/2 + 0.5) * (BASE_WIDTH * 0.995), 
-                    homeY: (vIdx - ROWS/2 + 0.5) * (BASE_HEIGHT * 0.995) 
+                    homeX: (uIdx - COLS/2 + 0.5) * (BASE_W * 0.995), 
+                    homeY: (vIdx - ROWS/2 + 0.5) * (BASE_H * 0.995) 
                 };
                 fragments.push(fragContainer);
                 ballGroup.add(fragContainer);
@@ -134,7 +135,7 @@
 
             generateGrid();
             scene.add(tileGroup);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+            scene.add(new THREE.AmbientLight(0xffffff, 0.2)); // Restored original light level
 
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('click', onClick);
@@ -201,12 +202,12 @@
             gsap.to(ballGroup.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
             gsap.to(ballGroup.position, { x: 0, y: 0, z: -8, duration: 2, ease: "expo.inOut" });
             fragments.forEach((f, i) => {
-                gsap.to(f.position, { x: f.userData.homeX, y: f.userData.homeY, z: 0, duration: 2, delay: i * 0.001, ease: "expo.inOut" });
+                gsap.to(f.position, { x: f.userData.homeX, y: f.userData.homeY, z: 0, duration: 2, delay: i * 0.002, ease: "expo.inOut" });
                 gsap.to(f.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
             });
         }
 
-        // --- REINSTATED SMOOTH FLIP ---
+        // --- RESTORED SMOOTH FLIP ---
         function flipResume() {
             isFlipped = !isFlipped;
             const targetY = isFlipped ? Math.PI : 0;
