@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA | SMOOTH FLIP</title>
+    <title>LUKA | COMPACT PRECISION</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -73,35 +73,34 @@
 
             ballGroup = new THREE.Group();
             const rows = 12, cols = 10; 
-            const a4Ratio = 1.414; 
+            const shortenedRatio = 1.27; // Adjusted from 1.414 (10% reduction in height)
             const baseSize = 1.2;
 
             for (let i = 0; i < rows * cols; i++) {
                 const fragContainer = new THREE.Group();
-                const geoFront = new THREE.PlaneGeometry(baseSize, baseSize * a4Ratio);
-                const matFront = new THREE.MeshStandardMaterial({ map: resumeTex, roughness: 0.4, metalness: 0.1 });
-                const meshFront = new THREE.Mesh(geoFront, matFront);
-
-                const geoBack = new THREE.PlaneGeometry(baseSize, baseSize * a4Ratio);
-                const matBack = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.4, metalness: 0.1 });
-                const meshBack = new THREE.Mesh(geoBack, matBack);
-                
-                meshBack.rotation.y = Math.PI;
-                meshBack.position.z = -0.005;
-
                 const u = i % cols;
                 const v = Math.floor(i / cols);
 
+                // --- FRONT PLANE ---
+                const geoFront = new THREE.PlaneGeometry(baseSize, baseSize * shortenedRatio);
+                const matFront = new THREE.MeshStandardMaterial({ map: resumeTex, roughness: 0.4, metalness: 0.1 });
                 const uvF = geoFront.attributes.uv;
                 for (let j = 0; j < uvF.count; j++) {
                     uvF.setXY(j, (uvF.getX(j) + u) / cols, (uvF.getY(j) + v) / rows);
                 }
+                const meshFront = new THREE.Mesh(geoFront, matFront);
 
+                // --- BACK PLANE ---
+                const geoBack = new THREE.PlaneGeometry(baseSize, baseSize * shortenedRatio);
+                const matBack = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.4, metalness: 0.1 });
                 const uvB = geoBack.attributes.uv;
                 for (let j = 0; j < uvB.count; j++) {
-                    const flippedU = ( (1 - uvB.getX(j)) + (cols - 1 - u) ) / cols;
-                    uvB.setXY(j, flippedU, (uvB.getY(j) + v) / rows);
+                    const backU = ( (1 - uvB.getX(j)) + (cols - 1 - u) ) / cols;
+                    uvB.setXY(j, backU, (uvB.getY(j) + v) / rows);
                 }
+                const meshBack = new THREE.Mesh(geoBack, matBack);
+                meshBack.rotation.y = Math.PI;
+                meshBack.position.z = -0.01;
 
                 fragContainer.add(meshFront);
                 fragContainer.add(meshBack);
@@ -113,7 +112,7 @@
                 
                 fragContainer.userData = { 
                     homeX: (u - cols/2 + 0.5) * (baseSize * 0.995), 
-                    homeY: (v - rows/2 + 0.5) * (baseSize * a4Ratio * 0.995) 
+                    homeY: (v - rows/2 + 0.5) * (baseSize * shortenedRatio * 0.995) 
                 };
                 fragments.push(fragContainer);
                 ballGroup.add(fragContainer);
@@ -198,8 +197,8 @@
 
         function unfoldBall() {
             isResumed = true;
-            gsap.to(ballGroup.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
-            gsap.to(ballGroup.position, { x: 0, y: 0, z: -8, duration: 2, ease: "expo.inOut" });
+            gsap.to(ballGroup.rotation, { x: 0, y: 0, z: 0, duration: 2.2, ease: "expo.inOut" });
+            gsap.to(ballGroup.position, { x: 0, y: 0, z: -8, duration: 2.2, ease: "expo.inOut" });
 
             fragments.forEach((f, i) => {
                 gsap.to(f.position, { 
@@ -207,11 +206,10 @@
                     y: f.userData.homeY, 
                     z: 0, 
                     duration: 2, 
-                    delay: i * 0.002, 
+                    delay: i * 0.001, 
                     ease: "expo.inOut" 
                 });
                 gsap.to(f.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
-                gsap.to(f.scale, { x: 1.01, y: 1.01, duration: 2, ease: "expo.inOut" });
             });
         }
 
@@ -220,11 +218,15 @@
             isFlipped = !isFlipped;
             const targetY = isFlipped ? Math.PI : 0;
             
+            gsap.to(ballGroup.position, { z: -10, duration: 0.6, ease: "power2.out" });
             gsap.to(ballGroup.rotation, { 
                 y: targetY, 
-                duration: 1.5, 
+                duration: 1.6, 
                 ease: "expo.inOut",
-                onComplete: () => { isAnimatingFlip = false; }
+                onComplete: () => { 
+                    isAnimatingFlip = false; 
+                    gsap.to(ballGroup.position, { z: -8, duration: 0.6, ease: "power2.inOut" });
+                }
             });
         }
 
@@ -254,15 +256,13 @@
                 ballGroup.rotation.x += 0.005;
             }
 
-            // Smoothing out the tilt logic
             if (isResumed && !isAnimatingFlip) {
                 const flipMod = isFlipped ? -1 : 1;
-                const targetRotX = -mouse.y * 0.15;
-                const targetRotY = (isFlipped ? Math.PI : 0) + (mouse.x * 0.15 * flipMod);
+                const targetRotX = -mouse.y * 0.12;
+                const targetRotY = (isFlipped ? Math.PI : 0) + (mouse.x * 0.12 * flipMod);
                 
-                // Slowed down lerp (0.05 to 0.03) for "heavier" feel
-                ballGroup.rotation.x = THREE.MathUtils.lerp(ballGroup.rotation.x, targetRotX, 0.03);
-                ballGroup.rotation.y = THREE.MathUtils.lerp(ballGroup.rotation.y, targetRotY, 0.03);
+                ballGroup.rotation.x = THREE.MathUtils.lerp(ballGroup.rotation.x, targetRotX, 0.04);
+                ballGroup.rotation.y = THREE.MathUtils.lerp(ballGroup.rotation.y, targetRotY, 0.04);
             }
 
             orbs.forEach(o => {
