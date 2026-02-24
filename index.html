@@ -25,10 +25,10 @@
         const resumeTex = loader.load('resume_front.jpg'); 
         const backTex = loader.load('resume_back.jpg');
 
-        // --- THE SQUARE PROOF MATH ---
+        // --- THE SQUARE PROOF MATH (1:1 RATIO) ---
+        const ROWS = 10;
         const COLS = 10;
-        const ROWS = 10; // Forced to 10x10 for a perfect square
-        const SIZE = 1.2; // Both Width and Height are now identical
+        const SIZE = 1.2; // Both width and height are 1.2
 
         function createTextTexture(text) {
             const canvas = document.createElement('canvas');
@@ -39,6 +39,7 @@
             ctx.fillStyle = '#ffefba';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 45;
             ctx.fillText(text, canvas.width / 2, canvas.height / 2);
             return new THREE.CanvasTexture(canvas);
         }
@@ -79,46 +80,31 @@
 
             for (let i = 0; i < ROWS * COLS; i++) {
                 const fragContainer = new THREE.Group();
-                const col = i % COLS;
-                const row = Math.floor(i / COLS);
+                const u = i % COLS;
+                const v = Math.floor(i / COLS);
 
-                // --- SQUARE GEOMETRY ---
-                const geo = new THREE.PlaneGeometry(SIZE, SIZE);
-                
-                // Assign UVs manually to ensure no stretching inside the piece
-                const uv = geo.attributes.uv;
-                for (let j = 0; j < uv.count; j++) {
-                    // Front side mapping
-                    const uFront = (uv.getX(j) + col) / COLS;
-                    const vFront = (uv.getY(j) + row) / ROWS;
-                    
-                    // Back side mapping (Mirrored horizontal columns)
-                    const uBack = ( (1 - uv.getX(j)) + (COLS - 1 - col) ) / COLS;
-                    const vBack = (uv.getY(j) + row) / ROWS;
-
-                    // Apply based on mesh
-                    if (j === 0) { // Creating two distinct geometries for front/back
-                        const geoF = geo.clone();
-                        const geoB = geo.clone();
-                        
-                        const uvF = geoF.attributes.uv;
-                        const uvB = geoB.attributes.uv;
-                        
-                        for(let k=0; k<uvF.count; k++) {
-                            uvF.setXY(k, (uvF.getX(k) + col) / COLS, (uvF.getY(k) + row) / ROWS);
-                            uvB.setXY(k, ((1 - uvB.getX(k)) + (COLS - 1 - col)) / COLS, (uvB.getY(k) + row) / ROWS);
-                        }
-
-                        const meshFront = new THREE.Mesh(geoF, new THREE.MeshStandardMaterial({ map: resumeTex, side: THREE.FrontSide }));
-                        const meshBack = new THREE.Mesh(geoB, new THREE.MeshStandardMaterial({ map: backTex, side: THREE.FrontSide }));
-                        
-                        meshBack.rotation.y = Math.PI;
-                        meshBack.position.z = -0.05; // Significant gap to prevent flickering
-
-                        fragContainer.add(meshFront);
-                        fragContainer.add(meshBack);
-                    }
+                // --- FRONT SIDE ---
+                const geoF = new THREE.PlaneGeometry(SIZE, SIZE);
+                const uvF = geoF.attributes.uv;
+                for (let j = 0; j < uvF.count; j++) {
+                    uvF.setXY(j, (uvF.getX(j) + u) / COLS, (uvF.getY(j) + v) / ROWS);
                 }
+                const meshFront = new THREE.Mesh(geoF, new THREE.MeshStandardMaterial({ map: resumeTex, roughness: 0.3, metalness: 0.2 }));
+
+                // --- BACK SIDE (MIRRORED) ---
+                const geoB = new THREE.PlaneGeometry(SIZE, SIZE);
+                const uvB = geoB.attributes.uv;
+                for (let j = 0; j < uvB.count; j++) {
+                    // Reverse internal U and shift by mirrored column index
+                    const uBack = ((1 - uvB.getX(j)) + (COLS - 1 - u)) / COLS;
+                    uvB.setXY(j, uBack, (uvB.getY(j) + v) / ROWS);
+                }
+                const meshBack = new THREE.Mesh(geoB, new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.3, metalness: 0.2 }));
+                meshBack.rotation.y = Math.PI;
+                meshBack.position.z = -0.05; // Gap to prevent flickering
+
+                fragContainer.add(meshFront);
+                fragContainer.add(meshBack);
 
                 const phi = Math.acos(-1 + (2 * i) / (ROWS * COLS));
                 const theta = Math.sqrt((ROWS * COLS) * Math.PI) * phi;
@@ -126,8 +112,8 @@
                 fragContainer.lookAt(0, 0, 0);
                 
                 fragContainer.userData = { 
-                    homeX: (col - COLS/2 + 0.5) * (SIZE * 0.99), 
-                    homeY: (row - ROWS/2 + 0.5) * (SIZE * 0.99) 
+                    homeX: (u - COLS/2 + 0.5) * (SIZE * 0.995), 
+                    homeY: (v - ROWS/2 + 0.5) * (SIZE * 0.995) 
                 };
                 fragments.push(fragContainer);
                 ballGroup.add(fragContainer);
@@ -136,12 +122,42 @@
             ballGroup.visible = false;
             scene.add(ballGroup);
 
-            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+            const configs = [{c:0xff007b, r:12}, {c:0x7000ff, r:10}, {c:0xffd700, r:14}];
+            configs.forEach((cfg, i) => {
+                const orb = new THREE.Group();
+                orb.add(new THREE.PointLight(cfg.c, 100, 30));
+                orb.add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshBasicMaterial({ color: cfg.c })));
+                orb.data = { a: i * 2, r: cfg.r };
+                orbs.push(orb); scene.add(orb);
+            });
+
+            generateGrid();
+            scene.add(tileGroup);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.2));
 
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('click', onClick);
             window.addEventListener('resize', onResize);
             animate();
+        }
+
+        function generateGrid() {
+            while(tileGroup.children.length > 0) tileGroup.remove(tileGroup.children[0]);
+            tiles = [];
+            const spacing = 0.65;
+            const tileGeo = new THREE.BoxGeometry(0.58, 0.58, 0.05);
+            const h = 2 * Math.tan((camera.fov * Math.PI) / 360) * 10;
+            const w = h * camera.aspect;
+            const cols = Math.ceil(w / spacing) + 12;
+            const rows = Math.ceil(h / spacing) + 8;
+            for (let x = -cols/2; x < cols/2; x++) {
+                for (let y = -rows/2; y < rows/2; y++) {
+                    // Reverted opacity to 0.35 per your request
+                    const tile = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, metalness: 0.9 }));
+                    tile.position.set(x * spacing, y * spacing, 0);
+                    tileGroup.add(tile); tiles.push(tile);
+                }
+            }
         }
 
         function onMouseMove(e) {
@@ -168,7 +184,13 @@
             isWarping = true;
             gsap.to(namePlane.scale, { x: 3, y: 0.1, duration: 0.8, ease: "power4.in" });
             gsap.to(namePlane.material, { opacity: 0, duration: 0.8 });
+            tiles.forEach(t => {
+                const d = Math.random() * 0.3;
+                gsap.to(t.position, { z: 50, x: t.position.x * 2.5, y: t.position.y * 2.5, duration: 1.5, delay: d, ease: "power2.in" });
+                gsap.to(t.material, { opacity: 0, duration: 1, delay: d + 0.5 });
+            });
             starLayers.forEach(l => gsap.to(l.position, { z: 200, duration: 3, ease: "power4.in" }));
+
             setTimeout(() => {
                 ballGroup.visible = true;
                 gsap.to(ballGroup.position, { z: -15, duration: 2.5, ease: "power2.out" });
@@ -181,7 +203,14 @@
             gsap.to(ballGroup.position, { x: 0, y: 0, z: -8, duration: 2, ease: "expo.inOut" });
 
             fragments.forEach((f, i) => {
-                gsap.to(f.position, { x: f.userData.homeX, y: f.userData.homeY, z: 0, duration: 2, ease: "expo.inOut" });
+                gsap.to(f.position, { 
+                    x: f.userData.homeX, 
+                    y: f.userData.homeY, 
+                    z: 0, 
+                    duration: 2, 
+                    delay: i * 0.001, 
+                    ease: "expo.inOut" 
+                });
                 gsap.to(f.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
             });
         }
@@ -190,21 +219,60 @@
             isAnimatingFlip = true;
             isFlipped = !isFlipped;
             const targetY = isFlipped ? Math.PI : 0;
+            
+            // Smoothed flip with zoom-out dolly effect
+            gsap.to(ballGroup.position, { z: -12, duration: 0.7, ease: "power2.out" });
             gsap.to(ballGroup.rotation, { 
                 y: targetY, 
-                duration: 1.6, 
+                duration: 1.4, 
                 ease: "expo.inOut",
-                onComplete: () => { isAnimatingFlip = false; }
+                onComplete: () => { 
+                    isAnimatingFlip = false; 
+                    gsap.to(ballGroup.position, { z: -8, duration: 0.7, ease: "power2.inOut" });
+                }
             });
         }
 
         function animate() {
             requestAnimationFrame(animate);
+            if (!isWarping) {
+                starLayers.forEach((l, i) => {
+                    l.position.x = THREE.MathUtils.lerp(l.position.x, mouse.x * (i + 1) * 1.5, 0.05);
+                    l.position.y = THREE.MathUtils.lerp(l.position.y, mouse.y * (i + 1) * 1.5, 0.05);
+                });
+                const tx = mouse.x * 10, ty = mouse.y * 6;
+                tiles.forEach(tile => {
+                    const dist = Math.sqrt((tile.position.x - tx)**2 + (tile.position.y - ty)**2);
+                    if (dist < 4) {
+                        const f = (4 - dist) / 4;
+                        tile.position.z = THREE.MathUtils.lerp(tile.position.z, f * 3, 0.1);
+                        tile.material.opacity = 0.35 + (f * 0.3);
+                    } else {
+                        tile.position.z = THREE.MathUtils.lerp(tile.position.z, 0, 0.08);
+                        tile.material.opacity = 0.35;
+                    }
+                });
+            }
+
+            if (ballGroup.visible && !isResumed) {
+                ballGroup.rotation.y += 0.01;
+                ballGroup.rotation.x += 0.005;
+            }
+
             if (isResumed && !isAnimatingFlip) {
                 const flipMod = isFlipped ? -1 : 1;
-                ballGroup.rotation.x = THREE.MathUtils.lerp(ballGroup.rotation.x, -mouse.y * 0.12, 0.04);
-                ballGroup.rotation.y = THREE.MathUtils.lerp(ballGroup.rotation.y, (isFlipped ? Math.PI : 0) + (mouse.x * 0.12 * flipMod), 0.04);
+                const targetRotX = -mouse.y * 0.12;
+                const targetRotY = (isFlipped ? Math.PI : 0) + (mouse.x * 0.12 * flipMod);
+                ballGroup.rotation.x = THREE.MathUtils.lerp(ballGroup.rotation.x, targetRotX, 0.04);
+                ballGroup.rotation.y = THREE.MathUtils.lerp(ballGroup.rotation.y, targetRotY, 0.04);
             }
+
+            orbs.forEach(o => {
+                o.data.a += 0.008;
+                o.position.x = Math.cos(o.data.a) * o.data.r;
+                o.position.y = Math.sin(o.data.a * 0.6) * 5;
+            });
+
             renderer.render(scene, camera);
         }
         init();
