@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA | DOUBLE SIDED</title>
+    <title>LUKA | TRUE DOUBLE SIDED</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -22,9 +22,8 @@
         const tileGroup = new THREE.Group();
 
         const loader = new THREE.TextureLoader();
-        // Texture 1: Front (Resume)
+        // Ensure these filenames match your GitHub uploads exactly
         const resumeTex = loader.load('resume_front.jpg'); 
-        // Texture 2: Back (The separate page)
         const backTex = loader.load('resume_back.jpg');
 
         function createTextTexture(text) {
@@ -75,45 +74,48 @@
 
             ballGroup = new THREE.Group();
             const rows = 12, cols = 10; 
-            const fragCount = rows * cols;
             const a4Ratio = 1.414; 
             const baseSize = 1.2;
 
-            for (let i = 0; i < fragCount; i++) {
+            for (let i = 0; i < rows * cols; i++) {
                 const fragContainer = new THREE.Group();
                 
-                // Front Plane
+                // FRONT MESH
                 const geoFront = new THREE.PlaneGeometry(baseSize, baseSize * a4Ratio);
-                const matFront = new THREE.MeshStandardMaterial({ map: resumeTex, roughness: 0.3, metalness: 0.2 });
+                const matFront = new THREE.MeshStandardMaterial({ map: resumeTex, roughness: 0.4, metalness: 0.1 });
                 const meshFront = new THREE.Mesh(geoFront, matFront);
 
-                // Back Plane (Rotated 180 deg)
+                // BACK MESH
                 const geoBack = new THREE.PlaneGeometry(baseSize, baseSize * a4Ratio);
-                const matBack = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.3, metalness: 0.2 });
+                const matBack = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.4, metalness: 0.1 });
                 const meshBack = new THREE.Mesh(geoBack, matBack);
+                
+                // Flip the back mesh so it faces away
                 meshBack.rotation.y = Math.PI;
-                meshBack.position.z = -0.01; // Tiny offset to prevent flickering
+                // Tiny Z-offset to prevent flickering
+                meshBack.position.z = -0.005;
 
                 const u = i % cols;
                 const v = Math.floor(i / cols);
 
-                // Map UVs for both sides
-                [geoFront, geoBack].forEach(geo => {
-                    const uvAttr = geo.attributes.uv;
-                    for (let j = 0; j < uvAttr.count; j++) {
-                        // For the back side, we mirror the U coordinate so the image isn't backward
-                        let uCoord = (uvAttr.getX(j) + u) / cols;
-                        if(geo === geoBack) uCoord = ( (1 - uvAttr.getX(j)) + (cols - 1 - u) ) / cols;
-                        
-                        uvAttr.setXY(j, uCoord, (uvAttr.getY(j) + v) / rows);
-                    }
-                });
+                // FRONT UVs
+                const uvF = geoFront.attributes.uv;
+                for (let j = 0; j < uvF.count; j++) {
+                    uvF.setXY(j, (uvF.getX(j) + u) / cols, (uvF.getY(j) + v) / rows);
+                }
+
+                // BACK UVs (Mirrored horizontally so text isn't backward)
+                const uvB = geoBack.attributes.uv;
+                for (let j = 0; j < uvB.count; j++) {
+                    const flippedU = ( (1 - uvB.getX(j)) + (cols - 1 - u) ) / cols;
+                    uvB.setXY(j, flippedU, (uvB.getY(j) + v) / rows);
+                }
 
                 fragContainer.add(meshFront);
                 fragContainer.add(meshBack);
 
-                const phi = Math.acos(-1 + (2 * i) / fragCount);
-                const theta = Math.sqrt(fragCount * Math.PI) * phi;
+                const phi = Math.acos(-1 + (2 * i) / (rows * cols));
+                const theta = Math.sqrt((rows * cols) * Math.PI) * phi;
                 fragContainer.position.setFromSphericalCoords(4, phi, theta);
                 fragContainer.lookAt(0, 0, 0);
                 
@@ -175,7 +177,6 @@
             if (!isWarping) {
                 if (raycaster.intersectObject(namePlane).length > 0) startWarp();
             } else if (!isResumed) {
-                // Raycast against all children of fragment groups
                 const targets = [];
                 fragments.forEach(f => targets.push(...f.children));
                 if (raycaster.intersectObjects(targets).length > 0) unfoldBall();
