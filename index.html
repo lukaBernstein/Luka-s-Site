@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA | RESTORED & REFINED</title>
+    <title>LUKA | FINAL ALIGNMENT</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -12,7 +12,6 @@
     </style>
 </head>
 <body>
-
     <script>
         let scene, camera, renderer, tiles = [], starLayers = [], orbs = [], namePlane;
         let ballGroup, fragments = [];
@@ -25,13 +24,16 @@
         const resumeTex = loader.load('resume_front.jpg'); 
         const backTex = loader.load('resume_back.jpg');
 
-        // --- ASPECT RATIO MATH ---
         // 1650 / 1275 = 1.2941
         const ROWS = 12;
         const COLS = 10;
         const ASPECT = 1.2941; 
         const BASE_W = 1.2;
         const BASE_H = BASE_W * ASPECT;
+
+        // TOTAL DIMENSIONS OF THE RESUME SHEET
+        const TOTAL_W = COLS * BASE_W;
+        const TOTAL_H = ROWS * BASE_H;
 
         function createTextTexture(text) {
             const canvas = document.createElement('canvas');
@@ -83,27 +85,37 @@
 
             for (let i = 0; i < ROWS * COLS; i++) {
                 const fragContainer = new THREE.Group();
-                const uIdx = i % COLS;
-                const vIdx = Math.floor(i / COLS);
+                const col = i % COLS;
+                const row = Math.floor(i / COLS);
 
-                // FRONT Side
+                // Calculate the "Home" center of this specific fragment
+                const hX = (col - COLS/2 + 0.5) * BASE_W;
+                const hY = (row - ROWS/2 + 0.5) * BASE_H;
+
+                // --- FRONT SIDE ---
                 const geoF = new THREE.PlaneGeometry(BASE_W, BASE_H);
                 const uvF = geoF.attributes.uv;
                 for (let j = 0; j < uvF.count; j++) {
-                    uvF.setXY(j, (uvF.getX(j) + uIdx) / COLS, (uvF.getY(j) + vIdx) / ROWS);
+                    // Planar projection: (vertexCoord + offset) / totalSize
+                    let vx = uvF.getX(j) * BASE_W + hX;
+                    let vy = uvF.getY(j) * BASE_H + hY;
+                    uvF.setXY(j, (vx / TOTAL_W) + 0.5, (vy / TOTAL_H) + 0.5);
                 }
                 const meshFront = new THREE.Mesh(geoF, new THREE.MeshStandardMaterial({ map: resumeTex, roughness: 0.3, metalness: 0.2 }));
 
-                // BACK Side (Mirrored sampling to prevent jumbled mess)
+                // --- BACK SIDE ---
                 const geoB = new THREE.PlaneGeometry(BASE_W, BASE_H);
                 const uvB = geoB.attributes.uv;
                 for (let j = 0; j < uvB.count; j++) {
-                    const uBack = ((1 - uvB.getX(j)) + (COLS - 1 - uIdx)) / COLS;
-                    uvB.setXY(j, uBack, (uvB.getY(j) + vIdx) / ROWS);
+                    // Mirror the X projection for the back side
+                    let vx = uvB.getX(j) * BASE_W + hX;
+                    let vy = uvB.getY(j) * BASE_H + hY;
+                    // Flip the U coordinate specifically for the back texture
+                    uvB.setXY(j, 0.5 - (vx / TOTAL_W), (vy / TOTAL_H) + 0.5);
                 }
                 const meshBack = new THREE.Mesh(geoB, new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.3, metalness: 0.2 }));
                 meshBack.rotation.y = Math.PI;
-                meshBack.position.z = -0.015;
+                meshBack.position.z = -0.02;
 
                 fragContainer.add(meshFront);
                 fragContainer.add(meshBack);
@@ -113,10 +125,7 @@
                 fragContainer.position.setFromSphericalCoords(4, phi, theta);
                 fragContainer.lookAt(0, 0, 0);
                 
-                fragContainer.userData = { 
-                    homeX: (uIdx - COLS/2 + 0.5) * (BASE_W * 0.995), 
-                    homeY: (vIdx - ROWS/2 + 0.5) * (BASE_H * 0.995) 
-                };
+                fragContainer.userData = { homeX: hX * 0.995, homeY: hY * 0.995 };
                 fragments.push(fragContainer);
                 ballGroup.add(fragContainer);
             }
@@ -135,7 +144,7 @@
 
             generateGrid();
             scene.add(tileGroup);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.2)); // Restored original light level
+            scene.add(new THREE.AmbientLight(0xffffff, 0.2));
 
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('click', onClick);
@@ -207,7 +216,6 @@
             });
         }
 
-        // --- RESTORED SMOOTH FLIP ---
         function flipResume() {
             isFlipped = !isFlipped;
             const targetY = isFlipped ? Math.PI : 0;
