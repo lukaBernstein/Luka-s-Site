@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA | FINAL ALIGNMENT</title>
+    <title>LUKA | RESTORED & ALIGNED</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -12,6 +12,7 @@
     </style>
 </head>
 <body>
+
     <script>
         let scene, camera, renderer, tiles = [], starLayers = [], orbs = [], namePlane;
         let ballGroup, fragments = [];
@@ -24,16 +25,11 @@
         const resumeTex = loader.load('resume_front.jpg'); 
         const backTex = loader.load('resume_back.jpg');
 
-        // 1650 / 1275 = 1.2941
-        const ROWS = 12;
-        const COLS = 10;
-        const ASPECT = 1.2941; 
-        const BASE_W = 1.2;
-        const BASE_H = BASE_W * ASPECT;
-
-        // TOTAL DIMENSIONS OF THE RESUME SHEET
-        const TOTAL_W = COLS * BASE_W;
-        const TOTAL_H = ROWS * BASE_H;
+        // --- ASPECT & DIMENSIONS (1275 x 1650) ---
+        const rows = 12, cols = 10; 
+        const fragCount = rows * cols;
+        const a4Ratio = 1.2941; // Precision ratio for 1650/1275
+        const baseSize = 1.2;
 
         function createTextTexture(text) {
             const canvas = document.createElement('canvas');
@@ -83,49 +79,44 @@
 
             ballGroup = new THREE.Group();
 
-            for (let i = 0; i < ROWS * COLS; i++) {
+            for (let i = 0; i < fragCount; i++) {
                 const fragContainer = new THREE.Group();
-                const col = i % COLS;
-                const row = Math.floor(i / COLS);
+                const u = i % cols;
+                const v = Math.floor(i / cols);
 
-                // Calculate the "Home" center of this specific fragment
-                const hX = (col - COLS/2 + 0.5) * BASE_W;
-                const hY = (row - ROWS/2 + 0.5) * BASE_H;
-
-                // --- FRONT SIDE ---
-                const geoF = new THREE.PlaneGeometry(BASE_W, BASE_H);
-                const uvF = geoF.attributes.uv;
+                // FRONT Side
+                const geoFront = new THREE.PlaneGeometry(baseSize, baseSize * a4Ratio);
+                const uvF = geoFront.attributes.uv;
                 for (let j = 0; j < uvF.count; j++) {
-                    // Planar projection: (vertexCoord + offset) / totalSize
-                    let vx = uvF.getX(j) * BASE_W + hX;
-                    let vy = uvF.getY(j) * BASE_H + hY;
-                    uvF.setXY(j, (vx / TOTAL_W) + 0.5, (vy / TOTAL_H) + 0.5);
+                    // Global sampling: (vertexUV + tileIndex) / totalTiles
+                    uvF.setXY(j, (uvF.getX(j) + u) / cols, (uvF.getY(j) + v) / rows);
                 }
-                const meshFront = new THREE.Mesh(geoF, new THREE.MeshStandardMaterial({ map: resumeTex, roughness: 0.3, metalness: 0.2 }));
+                const meshFront = new THREE.Mesh(geoFront, new THREE.MeshStandardMaterial({ map: resumeTex, roughness: 0.3, metalness: 0.2 }));
 
-                // --- BACK SIDE ---
-                const geoB = new THREE.PlaneGeometry(BASE_W, BASE_H);
-                const uvB = geoB.attributes.uv;
+                // BACK Side
+                const geoBack = new THREE.PlaneGeometry(baseSize, baseSize * a4Ratio);
+                const uvB = geoBack.attributes.uv;
                 for (let j = 0; j < uvB.count; j++) {
-                    // Mirror the X projection for the back side
-                    let vx = uvB.getX(j) * BASE_W + hX;
-                    let vy = uvB.getY(j) * BASE_H + hY;
-                    // Flip the U coordinate specifically for the back texture
-                    uvB.setXY(j, 0.5 - (vx / TOTAL_W), (vy / TOTAL_H) + 0.5);
+                    // Mirror logic: Samples the texture from right-to-left
+                    let uMirrored = ( (1 - uvB.getX(j)) + (cols - 1 - u) ) / cols;
+                    uvB.setXY(j, uMirrored, (uvB.getY(j) + v) / rows);
                 }
-                const meshBack = new THREE.Mesh(geoB, new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.3, metalness: 0.2 }));
+                const meshBack = new THREE.Mesh(geoBack, new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.3, metalness: 0.2 }));
                 meshBack.rotation.y = Math.PI;
-                meshBack.position.z = -0.02;
+                meshBack.position.z = -0.01;
 
                 fragContainer.add(meshFront);
                 fragContainer.add(meshBack);
 
-                const phi = Math.acos(-1 + (2 * i) / (ROWS * COLS));
-                const theta = Math.sqrt((ROWS * COLS) * Math.PI) * phi;
+                const phi = Math.acos(-1 + (2 * i) / fragCount);
+                const theta = Math.sqrt(fragCount * Math.PI) * phi;
                 fragContainer.position.setFromSphericalCoords(4, phi, theta);
                 fragContainer.lookAt(0, 0, 0);
                 
-                fragContainer.userData = { homeX: hX * 0.995, homeY: hY * 0.995 };
+                fragContainer.userData = { 
+                    homeX: (u - cols/2 + 0.5) * (baseSize * 0.995), 
+                    homeY: (v - rows/2 + 0.5) * (baseSize * a4Ratio * 0.995) 
+                };
                 fragments.push(fragContainer);
                 ballGroup.add(fragContainer);
             }
@@ -200,6 +191,7 @@
                 gsap.to(t.material, { opacity: 0, duration: 1, delay: d + 0.5 });
             });
             starLayers.forEach(l => gsap.to(l.position, { z: 200, duration: 3, ease: "power4.in" }));
+
             setTimeout(() => {
                 ballGroup.visible = true;
                 gsap.to(ballGroup.position, { z: -15, duration: 2.5, ease: "power2.out" });
@@ -210,9 +202,18 @@
             isResumed = true;
             gsap.to(ballGroup.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
             gsap.to(ballGroup.position, { x: 0, y: 0, z: -8, duration: 2, ease: "expo.inOut" });
+
             fragments.forEach((f, i) => {
-                gsap.to(f.position, { x: f.userData.homeX, y: f.userData.homeY, z: 0, duration: 2, delay: i * 0.002, ease: "expo.inOut" });
+                gsap.to(f.position, { 
+                    x: f.userData.homeX, 
+                    y: f.userData.homeY, 
+                    z: 0, 
+                    duration: 2, 
+                    delay: i * 0.002, 
+                    ease: "expo.inOut" 
+                });
                 gsap.to(f.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
+                gsap.to(f.scale, { x: 1.01, y: 1.01, duration: 2, ease: "expo.inOut" });
             });
         }
 
@@ -246,10 +247,12 @@
                     }
                 });
             }
+
             if (ballGroup.visible && !isResumed) {
                 ballGroup.rotation.y += 0.01;
                 ballGroup.rotation.x += 0.005;
             }
+
             if (isResumed) {
                 const flipMod = isFlipped ? -1 : 1;
                 const targetRotX = -mouse.y * 0.15;
@@ -257,11 +260,13 @@
                 ballGroup.rotation.x = THREE.MathUtils.lerp(ballGroup.rotation.x, targetRotX, 0.05);
                 ballGroup.rotation.y = THREE.MathUtils.lerp(ballGroup.rotation.y, targetRotY, 0.05);
             }
+
             orbs.forEach(o => {
                 o.data.a += 0.008;
                 o.position.x = Math.cos(o.data.a) * o.data.r;
                 o.position.y = Math.sin(o.data.a * 0.6) * 5;
             });
+
             renderer.render(scene, camera);
         }
         init();
