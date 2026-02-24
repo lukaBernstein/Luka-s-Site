@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA | SQUARE PROOF</title>
+    <title>LUKA | PRECISION ASPECT</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -25,10 +25,13 @@
         const resumeTex = loader.load('resume_front.jpg'); 
         const backTex = loader.load('resume_back.jpg');
 
-        // --- THE SQUARE PROOF MATH (1:1 RATIO) ---
-        const ROWS = 10;
+        // --- MATH CONSTANTS ---
+        const ROWS = 12;
         const COLS = 10;
-        const SIZE = 1.2; // Both width and height are 1.2
+        // 1650 / 1275 = 1.29411
+        const ASPECT_RATIO = 1.29411; 
+        const BASE_WIDTH = 1.2;
+        const BASE_HEIGHT = BASE_WIDTH * ASPECT_RATIO;
 
         function createTextTexture(text) {
             const canvas = document.createElement('canvas');
@@ -80,28 +83,29 @@
 
             for (let i = 0; i < ROWS * COLS; i++) {
                 const fragContainer = new THREE.Group();
-                const u = i % COLS;
-                const v = Math.floor(i / COLS);
+                const uIdx = i % COLS;
+                const vIdx = Math.floor(i / COLS);
 
-                // --- FRONT SIDE ---
-                const geoF = new THREE.PlaneGeometry(SIZE, SIZE);
+                // --- FRONT GEOMETRY ---
+                const geoF = new THREE.PlaneGeometry(BASE_WIDTH, BASE_HEIGHT);
                 const uvF = geoF.attributes.uv;
                 for (let j = 0; j < uvF.count; j++) {
-                    uvF.setXY(j, (uvF.getX(j) + u) / COLS, (uvF.getY(j) + v) / ROWS);
+                    uvF.setXY(j, (uvF.getX(j) + uIdx) / COLS, (uvF.getY(j) + vIdx) / ROWS);
                 }
                 const meshFront = new THREE.Mesh(geoF, new THREE.MeshStandardMaterial({ map: resumeTex, roughness: 0.3, metalness: 0.2 }));
 
-                // --- BACK SIDE (MIRRORED) ---
-                const geoB = new THREE.PlaneGeometry(SIZE, SIZE);
+                // --- BACK GEOMETRY (The Mirrored Fix) ---
+                const geoB = new THREE.PlaneGeometry(BASE_WIDTH, BASE_HEIGHT);
                 const uvB = geoB.attributes.uv;
                 for (let j = 0; j < uvB.count; j++) {
-                    // Reverse internal U and shift by mirrored column index
-                    const uBack = ((1 - uvB.getX(j)) + (COLS - 1 - u)) / COLS;
-                    uvB.setXY(j, uBack, (uvB.getY(j) + v) / ROWS);
+                    // Logic: Sampling the texture from right to left (mirrored)
+                    // The mirrored column index is (COLS - 1 - uIdx)
+                    const uBack = ( (1 - uvB.getX(j)) + (COLS - 1 - uIdx) ) / COLS;
+                    uvB.setXY(j, uBack, (uvB.getY(j) + vIdx) / ROWS);
                 }
                 const meshBack = new THREE.Mesh(geoB, new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.3, metalness: 0.2 }));
                 meshBack.rotation.y = Math.PI;
-                meshBack.position.z = -0.05; // Gap to prevent flickering
+                meshBack.position.z = -0.02;
 
                 fragContainer.add(meshFront);
                 fragContainer.add(meshBack);
@@ -112,8 +116,8 @@
                 fragContainer.lookAt(0, 0, 0);
                 
                 fragContainer.userData = { 
-                    homeX: (u - COLS/2 + 0.5) * (SIZE * 0.995), 
-                    homeY: (v - ROWS/2 + 0.5) * (SIZE * 0.995) 
+                    homeX: (uIdx - COLS/2 + 0.5) * (BASE_WIDTH * 0.995), 
+                    homeY: (vIdx - ROWS/2 + 0.5) * (BASE_HEIGHT * 0.995) 
                 };
                 fragments.push(fragContainer);
                 ballGroup.add(fragContainer);
@@ -133,7 +137,7 @@
 
             generateGrid();
             scene.add(tileGroup);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.2));
+            scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('click', onClick);
@@ -152,7 +156,6 @@
             const rows = Math.ceil(h / spacing) + 8;
             for (let x = -cols/2; x < cols/2; x++) {
                 for (let y = -rows/2; y < rows/2; y++) {
-                    // Reverted opacity to 0.35 per your request
                     const tile = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, metalness: 0.9 }));
                     tile.position.set(x * spacing, y * spacing, 0);
                     tileGroup.add(tile); tiles.push(tile);
@@ -199,8 +202,8 @@
 
         function unfoldBall() {
             isResumed = true;
-            gsap.to(ballGroup.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
-            gsap.to(ballGroup.position, { x: 0, y: 0, z: -8, duration: 2, ease: "expo.inOut" });
+            gsap.to(ballGroup.rotation, { x: 0, y: 0, z: 0, duration: 2.2, ease: "expo.inOut" });
+            gsap.to(ballGroup.position, { x: 0, y: 0, z: -8, duration: 2.2, ease: "expo.inOut" });
 
             fragments.forEach((f, i) => {
                 gsap.to(f.position, { 
@@ -220,11 +223,10 @@
             isFlipped = !isFlipped;
             const targetY = isFlipped ? Math.PI : 0;
             
-            // Smoothed flip with zoom-out dolly effect
-            gsap.to(ballGroup.position, { z: -12, duration: 0.7, ease: "power2.out" });
+            gsap.to(ballGroup.position, { z: -12, duration: 0.8, ease: "power2.out" });
             gsap.to(ballGroup.rotation, { 
                 y: targetY, 
-                duration: 1.4, 
+                duration: 1.5, 
                 ease: "expo.inOut",
                 onComplete: () => { 
                     isAnimatingFlip = false; 
