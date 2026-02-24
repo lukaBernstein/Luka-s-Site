@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA | RESTORED MASTER</title>
+    <title>LUKA | DOUBLE SIDED</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -23,9 +23,9 @@
 
         const loader = new THREE.TextureLoader();
         // Texture 1: Front (Resume)
-        const resumeTex = loader.load('https://raw.githubusercontent.com/lukaBernstein/Luka-s-Site/107354c44626685251b20ace879d1585ad2242c8/resume.jpg'); 
-        // Texture 2: Back (Placeholder)
-        const backTex = loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/grid.png');
+        const resumeTex = loader.load('resume_front.jpg'); 
+        // Texture 2: Back (The separate page)
+        const backTex = loader.load('resume_back.jpg');
 
         function createTextTexture(text) {
             const canvas = document.createElement('canvas');
@@ -73,7 +73,6 @@
             namePlane.position.z = -8;
             scene.add(namePlane);
 
-            // --- SEAMLESS A4 BALL SYSTEM ---
             ballGroup = new THREE.Group();
             const rows = 12, cols = 10; 
             const fragCount = rows * cols;
@@ -81,33 +80,49 @@
             const baseSize = 1.2;
 
             for (let i = 0; i < fragCount; i++) {
-                const geo = new THREE.PlaneGeometry(baseSize, baseSize * a4Ratio);
-                const mat = new THREE.MeshStandardMaterial({ 
-                    map: resumeTex, 
-                    side: THREE.DoubleSide, 
-                    roughness: 0.3, 
-                    metalness: 0.2 
-                });
+                const fragContainer = new THREE.Group();
+                
+                // Front Plane
+                const geoFront = new THREE.PlaneGeometry(baseSize, baseSize * a4Ratio);
+                const matFront = new THREE.MeshStandardMaterial({ map: resumeTex, roughness: 0.3, metalness: 0.2 });
+                const meshFront = new THREE.Mesh(geoFront, matFront);
 
-                const mesh = new THREE.Mesh(geo, mat);
+                // Back Plane (Rotated 180 deg)
+                const geoBack = new THREE.PlaneGeometry(baseSize, baseSize * a4Ratio);
+                const matBack = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.3, metalness: 0.2 });
+                const meshBack = new THREE.Mesh(geoBack, matBack);
+                meshBack.rotation.y = Math.PI;
+                meshBack.position.z = -0.01; // Tiny offset to prevent flickering
+
                 const u = i % cols;
                 const v = Math.floor(i / cols);
-                const uvAttr = geo.attributes.uv;
-                for (let j = 0; j < uvAttr.count; j++) {
-                    uvAttr.setXY(j, (uvAttr.getX(j) + u) / cols, (uvAttr.getY(j) + v) / rows);
-                }
+
+                // Map UVs for both sides
+                [geoFront, geoBack].forEach(geo => {
+                    const uvAttr = geo.attributes.uv;
+                    for (let j = 0; j < uvAttr.count; j++) {
+                        // For the back side, we mirror the U coordinate so the image isn't backward
+                        let uCoord = (uvAttr.getX(j) + u) / cols;
+                        if(geo === geoBack) uCoord = ( (1 - uvAttr.getX(j)) + (cols - 1 - u) ) / cols;
+                        
+                        uvAttr.setXY(j, uCoord, (uvAttr.getY(j) + v) / rows);
+                    }
+                });
+
+                fragContainer.add(meshFront);
+                fragContainer.add(meshBack);
 
                 const phi = Math.acos(-1 + (2 * i) / fragCount);
                 const theta = Math.sqrt(fragCount * Math.PI) * phi;
-                mesh.position.setFromSphericalCoords(4, phi, theta);
-                mesh.lookAt(0, 0, 0);
+                fragContainer.position.setFromSphericalCoords(4, phi, theta);
+                fragContainer.lookAt(0, 0, 0);
                 
-                mesh.userData = { 
+                fragContainer.userData = { 
                     homeX: (u - cols/2 + 0.5) * (baseSize * 0.995), 
                     homeY: (v - rows/2 + 0.5) * (baseSize * a4Ratio * 0.995) 
                 };
-                fragments.push(mesh);
-                ballGroup.add(mesh);
+                fragments.push(fragContainer);
+                ballGroup.add(fragContainer);
             }
             ballGroup.position.z = -150;
             ballGroup.visible = false;
@@ -124,7 +139,7 @@
 
             generateGrid();
             scene.add(tileGroup);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.2)); // Restored original light
+            scene.add(new THREE.AmbientLight(0xffffff, 0.2));
 
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('click', onClick);
@@ -132,7 +147,6 @@
             animate();
         }
 
-        // --- RESTORED ORIGINAL GRID LOGIC ---
         function generateGrid() {
             while(tileGroup.children.length > 0) tileGroup.remove(tileGroup.children[0]);
             tiles = [];
@@ -161,9 +175,14 @@
             if (!isWarping) {
                 if (raycaster.intersectObject(namePlane).length > 0) startWarp();
             } else if (!isResumed) {
-                if (raycaster.intersectObjects(fragments).length > 0) unfoldBall();
+                // Raycast against all children of fragment groups
+                const targets = [];
+                fragments.forEach(f => targets.push(...f.children));
+                if (raycaster.intersectObjects(targets).length > 0) unfoldBall();
             } else {
-                if (raycaster.intersectObjects(fragments).length > 0) flipResume();
+                const targets = [];
+                fragments.forEach(f => targets.push(...f.children));
+                if (raycaster.intersectObjects(targets).length > 0) flipResume();
             }
         }
 
