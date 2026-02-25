@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA BERNSTEIN | OBSIDIAN UNLOCK</title>
+    <title>LUKA BERNSTEIN | PORTFOLIO</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -14,7 +14,7 @@
 <body>
 
     <script>
-        let scene, camera, renderer, tiles = [], starObjects = [], orbs = [], namePlane;
+        let scene, camera, renderer, tiles = [], starObjects = [], orbs = [], namePlane, glowPlane, nameLight;
         let artifact, nebula, isWarping = false, arrived = false, isUnfolded = false, mainGroup;
         let warpProgress = 0; 
         
@@ -22,23 +22,43 @@
         const raycaster = new THREE.Raycaster();
         const tileGroup = new THREE.Group();
 
-        function createTextTexture(text) {
+        function createNameTexture(text) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            canvas.width = 4096; canvas.height = 1024;
+            canvas.width = 2048; canvas.height = 512;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.font = '500 320px "Times New Roman"';
-            ctx.fillStyle = '#ffefba';
+            ctx.font = '500 180px "Times New Roman"';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 40;
+            ctx.shadowColor = '#ffd700';
+            ctx.shadowBlur = 25; // More focused glow
+            ctx.fillStyle = '#ffffff';
             ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-            const tex = new THREE.CanvasTexture(canvas);
-            tex.anisotropy = 16;
-            return tex;
+            return new THREE.CanvasTexture(canvas);
         }
 
-        // --- NEW: NEBULA GENERATOR ---
+        function createAuraMesh() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
+            grad.addColorStop(0, 'rgba(218, 165, 32, 0.4)'); // Muted Gold
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 512, 512);
+            
+            const tex = new THREE.CanvasTexture(canvas);
+            const mat = new THREE.MeshBasicMaterial({ 
+                map: tex, 
+                transparent: true, 
+                blending: THREE.AdditiveBlending, 
+                opacity: 0.3 
+            });
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(50, 22), mat);
+            mesh.position.z = -8.2; 
+            return mesh;
+        }
+
         function createNebula() {
             const count = 2000;
             const geo = new THREE.BufferGeometry();
@@ -59,13 +79,12 @@
             return new THREE.Points(geo, mat);
         }
 
-        // --- NEW: OBSIDIAN POLYHEDRON GENERATOR ---
         function createObsidianPolyhedron() {
             const group = new THREE.Group();
             const baseGeo = new THREE.DodecahedronGeometry(4, 0);
             const posAttr = baseGeo.attributes.position;
-            const faceMaterial = new THREE.MeshStandardMaterial({ color: 0x050505, metalness: 0.9, roughness: 0.1, side: THREE.DoubleSide });
-            const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.8 });
+            const faceMat = new THREE.MeshStandardMaterial({ color: 0x050505, metalness: 0.9, roughness: 0.1, side: THREE.DoubleSide });
+            const edgeMat = new THREE.LineBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.8 });
 
             for (let i = 0; i < posAttr.count; i += 3) {
                 const geometry = new THREE.BufferGeometry();
@@ -76,16 +95,10 @@
                 ]);
                 geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
                 geometry.computeVertexNormals();
-
-                const mesh = new THREE.Mesh(geometry, faceMaterial);
-                const wireframe = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), edgeMaterial);
-                mesh.add(wireframe);
-
-                const center = new THREE.Vector3(
-                    (vertices[0] + vertices[3] + vertices[6]) / 3,
-                    (vertices[1] + vertices[4] + vertices[7]) / 3,
-                    (vertices[2] + vertices[5] + vertices[8]) / 3
-                );
+                const mesh = new THREE.Mesh(geometry, faceMat);
+                const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), edgeMat);
+                mesh.add(wire);
+                const center = new THREE.Vector3((vertices[0]+vertices[3]+vertices[6])/3, (vertices[1]+vertices[4]+vertices[7])/3, (vertices[2]+vertices[5]+vertices[8])/3);
                 mesh.userData = { offsetDir: center.normalize() };
                 group.add(mesh);
             }
@@ -96,21 +109,7 @@
             const radius = Math.random() * 600 + 100;
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(2 * Math.random() - 1);
-            star.position.x = radius * Math.sin(phi) * Math.cos(theta);
-            star.position.y = radius * Math.sin(phi) * Math.sin(theta);
-            star.position.z = initial ? (Math.random() * -1500) : -1200;
-        }
-
-        function initStars() {
-            const starGeo = new THREE.SphereGeometry(0.12, 8, 8);
-            const starMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            for(let i=0; i<3000; i++) {
-                const star = new THREE.Mesh(starGeo, starMat);
-                resetStar(star, true);
-                star.userData = { speed: Math.random() * 0.2 + 0.1 };
-                starObjects.push(star);
-                mainGroup.add(star);
-            }
+            star.position.set(radius * Math.sin(phi) * Math.cos(theta), radius * Math.sin(phi) * Math.sin(theta), initial ? (Math.random() * -1500) : -1200);
         }
 
         function init() {
@@ -121,22 +120,39 @@
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
             camera.position.z = 10;
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-            renderer.autoClearColor = false; 
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             document.body.appendChild(renderer.domElement);
 
-            initStars();
+            const starGeo = new THREE.SphereGeometry(0.12, 8, 8);
+            const starMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            for(let i=0; i<3000; i++) {
+                const star = new THREE.Mesh(starGeo, starMat);
+                resetStar(star, true);
+                star.userData = { speed: Math.random() * 0.2 + 0.1 };
+                starObjects.push(star);
+                mainGroup.add(star);
+            }
 
             namePlane = new THREE.Mesh(
-                new THREE.PlaneGeometry(46, 12),
-                new THREE.MeshStandardMaterial({ map: createTextTexture('LUKA BERNSTEIN'), transparent: true, emissive: 0xffd700, emissiveIntensity: 1.5 })
+                new THREE.PlaneGeometry(35, 10),
+                new THREE.MeshBasicMaterial({ 
+                    map: createNameTexture('LUKA BERNSTEIN'), 
+                    transparent: true,
+                    color: 0xffd700 
+                })
             );
             namePlane.position.z = -8;
             scene.add(namePlane);
 
-            // --- REPLACED ARTIFACT CODE ---
+            glowPlane = createAuraMesh();
+            scene.add(glowPlane);
+
+            nameLight = new THREE.PointLight(0xffd700, 200, 50);
+            nameLight.position.set(0, 0, -4.5); 
+            scene.add(nameLight);
+
             artifact = createObsidianPolyhedron();
             nebula = createNebula();
             artifact.add(nebula);
@@ -156,7 +172,7 @@
 
             generateGrid();
             scene.add(tileGroup);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            scene.add(new THREE.AmbientLight(0xffffff, 0.18)); 
 
             window.addEventListener('mousemove', (e) => {
                 mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -178,7 +194,7 @@
             const rg = Math.ceil(h / spacing) + 8;
             for (let x = -cg/2; x < cg/2; x++) {
                 for (let y = -rg/2; y < rg/2; y++) {
-                    const tile = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, metalness: 1.0, roughness: 0.02 }));
+                    const tile = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, metalness: 1.0, roughness: 0.05 }));
                     tile.position.set(x * spacing, y * spacing, 0);
                     tile.scale.set(1, 1, 0.2); 
                     tileGroup.add(tile); tiles.push(tile);
@@ -188,29 +204,12 @@
 
         function onClick() {
             raycaster.setFromCamera(mouse, camera);
-
-            // Handle Unfolding if already arrived
-            if (arrived) {
-                const intersects = raycaster.intersectObjects(artifact.children, true);
-                if (intersects.length > 0 && !isUnfolded) {
-                    isUnfolded = true;
-                    gsap.to(nebula.material, { opacity: 1, duration: 2.5 });
-                    artifact.children.forEach((child, i) => {
-                        if(child.userData.offsetDir) {
-                            const targetPos = child.userData.offsetDir.clone().multiplyScalar(8);
-                            gsap.to(child.position, { x: targetPos.x, y: targetPos.y, z: targetPos.z, duration: 3, ease: "power4.out", delay: i * 0.02 });
-                            gsap.to(child.rotation, { x: Math.random() * 6, y: Math.random() * 6, duration: 4 });
-                        }
-                    });
-                    return;
-                }
-            }
-
-            // Handle Initial Warp
             if (!isWarping && raycaster.intersectObject(namePlane).length > 0) {
                 isWarping = true;
-                gsap.to(namePlane.scale, { x: 3, y: 0.1, duration: 0.8, ease: "power4.in" });
-                gsap.to(namePlane.material, { opacity: 0, duration: 0.8 });
+                gsap.to([namePlane.scale, glowPlane.scale], { x: 3, y: 0.1, duration: 0.8, ease: "power4.in" });
+                gsap.to([namePlane.material, glowPlane.material], { opacity: 0, duration: 0.8 });
+                gsap.to(nameLight, { intensity: 0, duration: 0.8 });
+                
                 tiles.forEach(t => {
                     const d = Math.random() * 0.3;
                     gsap.to(t.position, { z: 50, x: t.position.x * 5, y: t.position.y * 5, duration: 1.5, delay: d, ease: "power2.in" });
@@ -219,30 +218,41 @@
                 gsap.to(window, { 
                     duration: 4.0, 
                     onUpdate: function() { warpProgress = this.progress(); },
-                    onComplete: () => { 
-                        arrived = true;
-                        starObjects.forEach(s => { s.position.z = Math.random() * -1500; });
-                    }
+                    onComplete: () => { arrived = true; }
                 });
                 starObjects.forEach(s => {
-                    gsap.to(s.scale, { z: 150, duration: 1.0, ease: "power2.in" });
-                    gsap.to(s.scale, { z: 1, duration: 0.5, delay: 3.2, ease: "power2.out" });
+                    gsap.to(s.scale, { z: 150, duration: 1.0 });
+                    gsap.to(s.scale, { z: 1, duration: 0.5, delay: 3.2 });
                 });
                 setTimeout(() => {
                     artifact.visible = true;
-                    gsap.to(artifact.position, { z: -15, duration: 1.2, ease: "power4.out" });
+                    gsap.to(artifact.position, { z: -15, duration: 1.2 });
                 }, 2800);
             }
         }
 
         function animate() {
             requestAnimationFrame(animate);
-            renderer.setClearColor(0x000000, isWarping && !arrived ? 0.2 : 1.0); 
-            renderer.clear(true, true, true);
+            renderer.render(scene, camera);
             
+            if (namePlane && !isWarping) {
+                const time = Date.now() * 0.0018; // Slightly slower
+                const breath = (Math.sin(time) + 1) / 2; 
+                
+                // Subtle color shift
+                namePlane.material.color.setRGB(1.0, 0.8 + (0.1 * breath), 0.4 + (0.4 * breath));
+                
+                // Subtle aura shift
+                glowPlane.material.opacity = 0.2 + (0.3 * breath); // Max opacity 0.5
+                const s = 1.0 + (breath * 0.05); // Only 5% growth
+                glowPlane.scale.set(s, s, 1);
+
+                // Subtle light shift
+                nameLight.intensity = 180 + (breath * 120); 
+            }
+
             if(isWarping && !arrived) {
-                const intensity = Math.pow(Math.sin(warpProgress * Math.PI), 1.5);
-                camera.fov = 75 + (intensity * 60);
+                camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 60);
                 camera.updateProjectionMatrix();
             } else if (arrived) {
                 camera.fov = THREE.MathUtils.lerp(camera.fov, 75, 0.1);
@@ -250,10 +260,7 @@
             }
 
             starObjects.forEach(s => {
-                let speed = s.userData.speed;
-                if (isWarping && !arrived) {
-                    speed += Math.pow(Math.sin(warpProgress * Math.PI), 2) * 60;
-                }
+                let speed = s.userData.speed + (isWarping && !arrived ? Math.pow(Math.sin(warpProgress * Math.PI), 2) * 60 : 0);
                 s.position.z += speed;
                 if (s.position.z > 20) resetStar(s);
             });
@@ -261,9 +268,9 @@
             if (!isWarping) {
                 const tx = mouse.x * 10, ty = mouse.y * 6;
                 tiles.forEach(tile => {
-                    const dist = Math.sqrt((tile.position.x - tx)**2 + (tile.position.y - ty)**2);
-                    if (dist < 4) {
-                        const f = (4 - dist) / 4;
+                    const d = Math.sqrt((tile.position.x - tx)**2 + (tile.position.y - ty)**2);
+                    if (d < 4) {
+                        const f = (4 - d) / 4;
                         tile.position.z = THREE.MathUtils.lerp(tile.position.z, f * 3, 0.1);
                         tile.material.opacity = 0.35 + (f * 0.3);
                     } else {
@@ -277,10 +284,6 @@
                 artifact.rotation.y += 0.002;
                 artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 0.4, 0.05);
                 artifact.rotation.y += mouse.x * 0.01;
-                if (isUnfolded) {
-                    nebula.rotation.y += 0.001;
-                    nebula.rotation.z += 0.001;
-                }
             }
 
             orbs.forEach(o => {
@@ -291,14 +294,13 @@
                 o.position.y = Math.sin(o.data.a * 0.6) * THREE.MathUtils.lerp(5, 2.5, t);
                 o.position.z = THREE.MathUtils.lerp(0, -15, t);
             });
-
-            renderer.render(scene, camera);
         }
 
         function onResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            generateGrid();
         }
 
         init();
