@@ -31,7 +31,7 @@
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.shadowColor = '#ffd700';
-            ctx.shadowBlur = 25; // More focused glow
+            ctx.shadowBlur = 30; 
             ctx.fillStyle = '#ffffff';
             ctx.fillText(text, canvas.width / 2, canvas.height / 2);
             return new THREE.CanvasTexture(canvas);
@@ -42,7 +42,7 @@
             canvas.width = 512; canvas.height = 512;
             const ctx = canvas.getContext('2d');
             const grad = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
-            grad.addColorStop(0, 'rgba(218, 165, 32, 0.4)'); // Muted Gold
+            grad.addColorStop(0, 'rgba(255, 215, 0, 0.6)'); 
             grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, 512, 512);
@@ -54,7 +54,7 @@
                 blending: THREE.AdditiveBlending, 
                 opacity: 0.3 
             });
-            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(50, 22), mat);
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(52, 24), mat);
             mesh.position.z = -8.2; 
             return mesh;
         }
@@ -149,7 +149,7 @@
             glowPlane = createAuraMesh();
             scene.add(glowPlane);
 
-            nameLight = new THREE.PointLight(0xffd700, 200, 50);
+            nameLight = new THREE.PointLight(0xffd700, 250, 55);
             nameLight.position.set(0, 0, -4.5); 
             scene.add(nameLight);
 
@@ -236,19 +236,19 @@
             renderer.render(scene, camera);
             
             if (namePlane && !isWarping) {
-                const time = Date.now() * 0.0018; // Slightly slower
+                const time = Date.now() * 0.0022; 
                 const breath = (Math.sin(time) + 1) / 2; 
                 
-                // Subtle color shift
-                namePlane.material.color.setRGB(1.0, 0.8 + (0.1 * breath), 0.4 + (0.4 * breath));
+                // Pulsing color shift
+                namePlane.material.color.setRGB(1.0, 0.8 + (0.15 * breath), 0.35 + (0.5 * breath));
                 
-                // Subtle aura shift
-                glowPlane.material.opacity = 0.2 + (0.3 * breath); // Max opacity 0.5
-                const s = 1.0 + (breath * 0.05); // Only 5% growth
+                // Pulsing aura shift
+                glowPlane.material.opacity = 0.1 + (0.5 * breath); 
+                const s = 1.0 + (breath * 0.1); 
                 glowPlane.scale.set(s, s, 1);
 
-                // Subtle light shift
-                nameLight.intensity = 180 + (breath * 120); 
+                // Pulsing light shift
+                nameLight.intensity = 180 + (breath * 270); 
             }
 
             if(isWarping && !arrived) {
