@@ -21,6 +21,7 @@
         const raycaster = new THREE.Raycaster();
         const tileGroup = new THREE.Group();
 
+        // 1. Data Generation for Nebula Resume Text
         function getResumeCoords() {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -47,6 +48,7 @@
             return points;
         }
 
+        // 2. Visual Component Creators
         function createNameTexture(text) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -98,22 +100,12 @@
             const group = new THREE.Group();
             const baseGeo = new THREE.DodecahedronGeometry(4, 0);
             const posAttr = baseGeo.attributes.position;
-            
-            // --- RAINBOW ANODIZED SURFACE ---
             const faceMat = new THREE.MeshPhysicalMaterial({ 
-                color: 0x222222, 
-                metalness: 1.0, 
-                roughness: 0.15,
-                iridescence: 1.0, 
-                iridescenceIOR: 1.8,
-                iridescenceThicknessRange: [100, 400],
-                transparent: true, 
-                opacity: 0.9, 
-                side: THREE.DoubleSide 
+                color: 0x222222, metalness: 1.0, roughness: 0.15,
+                iridescence: 1.0, iridescenceIOR: 1.8, iridescenceThicknessRange: [100, 400],
+                transparent: true, opacity: 0.9, side: THREE.DoubleSide 
             });
-
             const edgeMat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.7 });
-
             for (let i = 0; i < posAttr.count; i += 3) {
                 const geometry = new THREE.BufferGeometry();
                 const v = [posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i), posAttr.getX(i+1), posAttr.getY(i+1), posAttr.getZ(i+1), posAttr.getX(i+2), posAttr.getY(i+2), posAttr.getZ(i+2)];
@@ -145,6 +137,7 @@
             renderer.toneMapping = THREE.ReinhardToneMapping; 
             document.body.appendChild(renderer.domElement);
 
+            // Stars Background
             const starGeo = new THREE.SphereGeometry(0.12, 8, 8);
             for(let i=0; i<3000; i++) {
                 const star = new THREE.Mesh(starGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
@@ -153,11 +146,13 @@
                 starObjects.push(star); mainGroup.add(star);
             }
 
+            // Landing UI Elements
             namePlane = new THREE.Mesh(new THREE.PlaneGeometry(35, 10), new THREE.MeshBasicMaterial({ map: createNameTexture('LUKA BERNSTEIN'), transparent: true, color: 0xffd700 }));
             namePlane.position.z = -8; scene.add(namePlane);
             glowPlane = createAuraMesh(); scene.add(glowPlane);
             nameLight = new THREE.PointLight(0xffd700, 250, 55); nameLight.position.set(0, 0, -4.5); scene.add(nameLight);
 
+            // Artifact & Nebula
             artifact = createObsidianPolyhedron();
             nebula = createNebula(); artifact.add(nebula);
             artifact.position.z = -1000; artifact.visible = false; mainGroup.add(artifact);
@@ -166,11 +161,17 @@
             buttonBox = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0 }));
             buttonBox.position.set(0, 0.2, 0.5); nebula.add(buttonBox);
 
-            const configs = [{c:0xff007b, r:10}, {c:0x7000ff, r:12}, {c:0xffd700, r:11}];
+            // Orbs (including the Orthogonal 4th orb)
+            const configs = [
+                {c:0xff007b, r:10, type:'h'}, 
+                {c:0x7000ff, r:12, type:'h'}, 
+                {c:0xffd700, r:11, type:'h'},
+                {c:0x00ffff, r:10.5, type:'v'} // The Orthogonal Orb
+            ];
             configs.forEach((cfg, i) => {
                 const orb = new THREE.Group();
                 orb.add(new THREE.PointLight(cfg.c, 150, 40)); orb.add(new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), new THREE.MeshBasicMaterial({ color: cfg.c })));
-                orb.data = { a: i * 2, r: cfg.r }; orbs.push(orb); mainGroup.add(orb);
+                orb.data = { a: i * 2, r: cfg.r, type: cfg.type }; orbs.push(orb); mainGroup.add(orb);
             });
 
             generateGrid(); scene.add(tileGroup);
@@ -310,9 +311,15 @@
                 o.data.a += 0.01;
                 let t = isWarping ? warpProgress : 0;
                 let currentR = THREE.MathUtils.lerp(o.data.r, o.data.r + 10, Math.pow(t, 1.5));
-                o.position.x = Math.cos(o.data.a) * currentR;
-                o.position.y = Math.sin(o.data.a * 0.6) * THREE.MathUtils.lerp(4, 8, t);
-                o.position.z = THREE.MathUtils.lerp(0, -15, t);
+                if(o.data.type === 'v') {
+                    o.position.y = Math.cos(o.data.a) * currentR;
+                    o.position.z = Math.sin(o.data.a) * currentR + THREE.MathUtils.lerp(0, -15, t);
+                    o.position.x = Math.sin(o.data.a * 0.5) * 2;
+                } else {
+                    o.position.x = Math.cos(o.data.a) * currentR;
+                    o.position.y = Math.sin(o.data.a * 0.6) * THREE.MathUtils.lerp(4, 8, t);
+                    o.position.z = THREE.MathUtils.lerp(0, -15, t);
+                }
             });
         }
 
