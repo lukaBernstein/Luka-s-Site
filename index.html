@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA BERNSTEIN | SEAMLESS WARP</title>
+    <title>LUKA BERNSTEIN | HYPERSPACE ORBS</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -16,6 +16,8 @@
     <script>
         let scene, camera, renderer, tiles = [], starObjects = [], orbs = [], namePlane;
         let artifact, isWarping = false, starContainer;
+        let warpProgress = 0; 
+        let currentWarpOffset = { x: 0, y: 0 };
         
         const mouse = new THREE.Vector2(-10, -10); 
         const raycaster = new THREE.Raycaster();
@@ -42,35 +44,28 @@
             return tex;
         }
 
-        // NEW: Spherical distribution to remove the "Square" artifact
         function getRandomSpherePoint(radius) {
             const u = Math.random();
             const v = Math.random();
             const theta = 2 * Math.PI * u;
             const phi = Math.acos(2 * v - 1);
-            const x = radius * Math.sin(phi) * Math.cos(theta);
-            const y = radius * Math.sin(phi) * Math.sin(theta);
-            const z = radius * Math.cos(phi);
-            return { x, y, z };
+            return {
+                x: radius * Math.sin(phi) * Math.cos(theta),
+                y: radius * Math.sin(phi) * Math.sin(theta),
+                z: radius * Math.cos(phi)
+            };
         }
 
         function initStars() {
             starContainer = new THREE.Group();
             scene.add(starContainer);
-
             const starGeo = new THREE.SphereGeometry(0.12, 8, 8);
             const starMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            
             for(let i=0; i<3000; i++) {
                 const star = new THREE.Mesh(starGeo, starMat);
-                // Spread stars in a sphere instead of a cube
-                const point = getRandomSpherePoint(Math.random() * 400 + 100);
-                star.position.set(point.x, point.y, point.z - 200);
-                
-                star.userData = { 
-                    speed: Math.random() * 0.2 + 0.1,
-                    radius: Math.sqrt(point.x*point.x + point.y*point.y) // for parallax
-                };
+                const point = getRandomSpherePoint(Math.random() * 450 + 100);
+                star.position.set(point.x, point.y, point.z - 250);
+                star.userData = { speed: Math.random() * 0.2 + 0.1 };
                 starObjects.push(star);
                 starContainer.add(star);
             }
@@ -97,12 +92,11 @@
 
             const knotGeo = new THREE.TorusKnotGeometry(3.5, 1.2, 300, 100);
             const knotMat = new THREE.MeshStandardMaterial({ 
-                map: resumeTex,
-                metalness: 0.7, roughness: 0.2,
+                map: resumeTex, metalness: 0.7, roughness: 0.2,
                 emissive: 0x111111, side: THREE.DoubleSide
             });
             artifact = new THREE.Mesh(knotGeo, knotMat);
-            artifact.position.z = -250; 
+            artifact.position.z = -350; // Hidden deep in space
             artifact.visible = false;
             scene.add(artifact);
 
@@ -112,7 +106,9 @@
                 orb.add(new THREE.PointLight(cfg.c, 150, 40)); 
                 orb.add(new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), new THREE.MeshBasicMaterial({ color: cfg.c })));
                 orb.data = { a: i * 2, r: cfg.r };
-                orbs.push(orb); scene.add(orb);
+                orb.position.z = 0; // Start at front
+                orbs.push(orb); 
+                scene.add(orb);
             });
 
             generateGrid();
@@ -137,7 +133,6 @@
             const w = h * camera.aspect;
             const cg = Math.ceil(w / spacing) + 12;
             const rg = Math.ceil(h / spacing) + 8;
-
             for (let x = -cg/2; x < cg/2; x++) {
                 for (let y = -rg/2; y < rg/2; y++) {
                     const tile = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({ 
@@ -160,19 +155,32 @@
                 
                 tiles.forEach(t => {
                     const d = Math.random() * 0.3;
-                    gsap.to(t.position, { z: 50, x: t.position.x * 4, y: t.position.y * 4, duration: 1.5, delay: d, ease: "power2.in" });
+                    gsap.to(t.position, { z: 50, x: t.position.x * 5, y: t.position.y * 5, duration: 1.5, delay: d, ease: "power2.in" });
                     gsap.to(t.material, { opacity: 0, duration: 1, delay: d + 0.5 });
                 });
 
+                // HYPERSPACE ORBS: They fly back with you
+                orbs.forEach(orb => {
+                    gsap.to(orb.position, { z: -12, duration: 4.5, ease: "expo.inOut" });
+                });
+
+                // Curve/Warp Timeline
+                gsap.to(window, { 
+                    duration: 4.5, 
+                    onUpdate: function() {
+                        warpProgress = this.progress();
+                    }
+                });
+
                 starObjects.forEach(s => {
-                    gsap.to(s.scale, { z: 65, duration: 1.2, ease: "power2.in" });
-                    gsap.to(s.position, { z: s.position.z + 500, duration: 3, ease: "power3.in" });
-                    gsap.to(s.scale, { z: 1, duration: 1, delay: 2.8, ease: "power2.out" });
+                    gsap.to(s.scale, { z: 75, duration: 1.2, ease: "power2.in" });
+                    gsap.to(s.position, { z: s.position.z + 650, duration: 3.8, ease: "power3.in" });
+                    gsap.to(s.scale, { z: 1, duration: 1, delay: 3.2, ease: "power2.out" });
                 });
 
                 setTimeout(() => {
                     artifact.visible = true;
-                    gsap.to(artifact.position, { z: -12, duration: 4, ease: "expo.out" });
+                    gsap.to(artifact.position, { z: -12, duration: 4.5, ease: "expo.out" });
                 }, 800);
             }
         }
@@ -180,18 +188,26 @@
         function animate() {
             requestAnimationFrame(animate);
             
+            if(isWarping) {
+                const intensity = Math.sin(warpProgress * Math.PI); 
+                currentWarpOffset.x = intensity * 15;
+                currentWarpOffset.y = intensity * 8;
+                
+                starContainer.position.x = -currentWarpOffset.x;
+                starContainer.position.y = -currentWarpOffset.y;
+                artifact.position.x = -currentWarpOffset.x;
+                artifact.position.y = -currentWarpOffset.y;
+
+                camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, intensity * 0.3, 0.05);
+            }
+
             starObjects.forEach(s => {
                 s.position.z += s.userData.speed;
-                // Seamless recycling logic with spherical re-randomization
                 if(s.position.z > 50) {
                     const point = getRandomSpherePoint(Math.random() * 400 + 200);
-                    s.position.set(point.x, point.y, -800);
+                    s.position.set(point.x, point.y, -850);
                 }
             });
-
-            if(isWarping) {
-                starContainer.rotation.y += 0.0003;
-            }
 
             if (!isWarping) {
                 const tx = mouse.x * 10, ty = mouse.y * 6;
@@ -217,8 +233,12 @@
 
             orbs.forEach(o => {
                 o.data.a += 0.008;
-                o.position.x = Math.cos(o.data.a) * o.data.r;
-                o.position.y = Math.sin(o.data.a * 0.6) * 5;
+                const basePosX = Math.cos(o.data.a) * o.data.r;
+                const basePosY = Math.sin(o.data.a * 0.6) * 5;
+                
+                // Keep the orbs pinned to the curve offset
+                o.position.x = basePosX - currentWarpOffset.x;
+                o.position.y = basePosY - currentWarpOffset.y;
             });
 
             renderer.render(scene, camera);
