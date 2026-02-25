@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA | SOLID ALIGNMENT</title>
+    <title>LUKA | RESTORED GRID & THICKNESS</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -16,8 +16,8 @@
     <script>
         let scene, camera, renderer, tiles = [], starLayers = [], orbs = [], namePlane;
         let ballGroup, fragments = [];
-        
         let isWarping = false, isResumed = false, isFlipped = false, isAnimatingFlip = false;
+        
         const mouse = new THREE.Vector2(-10, -10); 
         const raycaster = new THREE.Raycaster();
         const tileGroup = new THREE.Group();
@@ -26,13 +26,12 @@
         const resumeTex = loader.load('resume_front.jpg'); 
         const backTex = loader.load('resume_back.jpg');
 
+        // --- DIMENSIONS & RATIO ---
         const rows = 12, cols = 10; 
-        const fragCount = rows * cols;
-        const IMAGE_ASPECT = 1650 / 1275; 
-        const GRID_RATIO = cols / rows; 
-        const ASPECT_MULTIPLIER = IMAGE_ASPECT * GRID_RATIO; 
-        const baseW = 1.2;
-        const baseH = baseW * ASPECT_MULTIPLIER; 
+        const ASPECT_RATIO = 1.2941; // 1650 / 1275
+        const baseSize = 1.2;
+        const fragW = baseSize / cols;
+        const fragH = (baseSize * ASPECT_RATIO) / rows;
 
         function createTextTexture(text) {
             const canvas = document.createElement('canvas');
@@ -53,8 +52,7 @@
             const starPos = new Float32Array(count * 3);
             for(let i=0; i<count*3; i++) starPos[i] = (Math.random() - 0.5) * 600;
             starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-            const starMat = new THREE.PointsMaterial({ size, color: 0xffffff, transparent: true, opacity });
-            const points = new THREE.Points(starGeo, starMat);
+            const points = new THREE.Points(starGeo, new THREE.PointsMaterial({ size, color: 0xffffff, transparent: true, opacity }));
             points.position.z = depth;
             scene.add(points);
             return points;
@@ -82,64 +80,54 @@
 
             ballGroup = new THREE.Group();
 
-            // Create materials array for the box faces
-            // 0:Right, 1:Left, 2:Top, 3:Bottom, 4:Front, 5:Back
-            const boxMaterials = [
-                new THREE.MeshStandardMaterial({ color: 0x333333 }), // side
-                new THREE.MeshStandardMaterial({ color: 0x333333 }), // side
-                new THREE.MeshStandardMaterial({ color: 0x333333 }), // top
-                new THREE.MeshStandardMaterial({ color: 0x333333 }), // bottom
-                new THREE.MeshStandardMaterial({ map: resumeTex, roughness: 0.4, metalness: 0.1 }), // FRONT
-                new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.4, metalness: 0.1 })   // BACK
+            // Materials for the 6 sides of the Box: [R, L, Top, Bottom, Front, Back]
+            const boxMats = [
+                new THREE.MeshStandardMaterial({ color: 0x222222 }), 
+                new THREE.MeshStandardMaterial({ color: 0x222222 }),
+                new THREE.MeshStandardMaterial({ color: 0x222222 }),
+                new THREE.MeshStandardMaterial({ color: 0x222222 }),
+                new THREE.MeshStandardMaterial({ map: resumeTex }), 
+                new THREE.MeshStandardMaterial({ map: backTex })
             ];
 
-            for (let i = 0; i < fragCount; i++) {
+            for (let i = 0; i < rows * cols; i++) {
                 const uIdx = i % cols;
                 const vIdx = Math.floor(i / cols);
 
-                // --- BOX GEOMETRY WITH THICKNESS (0.05) ---
-                const geometry = new THREE.BoxGeometry(baseW, baseH, 0.05);
+                // --- THICKNESS ADDED HERE (0.05) ---
+                const geo = new THREE.BoxGeometry(fragW, fragH, 0.05);
                 
-                // We need to remap UVs specifically for the Front (Face 4) and Back (Face 5)
-                const uStart = uIdx / cols;
-                const uEnd = (uIdx + 1) / cols;
-                const vStart = vIdx / rows;
-                const vEnd = (vIdx + 1) / rows;
+                // Fix UVs for Front (Face 4) and Back (Face 5)
+                const uv = geo.attributes.uv;
+                const uS = uIdx / cols;
+                const uE = (uIdx + 1) / cols;
+                const vS = vIdx / rows;
+                const vE = (vIdx + 1) / rows;
 
-                const uvAttr = geometry.attributes.uv;
+                // Front UV Mapping
+                const f = 16; 
+                uv.setXY(f+0, uS, vE); uv.setXY(f+1, uE, vE); uv.setXY(f+2, uS, vS); uv.setXY(f+3, uE, vS);
 
-                // Remap Front Face UVs (Face index 4)
-                const fOffset = 4 * 4; // 4 vertices per face
-                uvAttr.setXY(fOffset + 0, uStart, vEnd);
-                uvAttr.setXY(fOffset + 1, uEnd, vEnd);
-                uvAttr.setXY(fOffset + 2, uStart, vStart);
-                uvAttr.setXY(fOffset + 3, uEnd, vStart);
+                // Back UV Mapping (Mirrored U for the flip)
+                const b = 20;
+                const uS_B = (cols - uIdx) / cols;
+                const uE_B = (cols - 1 - uIdx) / cols;
+                uv.setXY(b+0, uS_B, vE); uv.setXY(b+1, uE_B, vE); uv.setXY(b+2, uS_B, vS); uv.setXY(b+3, uE_B, vS);
 
-                // Remap Back Face UVs (Face index 5) - Mirrored horizontally
-                const bOffset = 5 * 4;
-                const bUStart = (cols - uIdx) / cols;
-                const bUEnd = (cols - 1 - uIdx) / cols;
-                uvAttr.setXY(bOffset + 0, bUStart, vEnd);
-                uvAttr.setXY(bOffset + 1, bUEnd, vEnd);
-                uvAttr.setXY(bOffset + 2, bUStart, vStart);
-                uvAttr.setXY(bOffset + 3, bUEnd, vStart);
+                const fragment = new THREE.Mesh(geo, boxMats);
 
-                const fragment = new THREE.Mesh(geometry, boxMaterials);
-
-                // Spherical positioning
-                const phi = Math.acos(-1 + (2 * i) / fragCount);
-                const theta = Math.sqrt(fragCount * Math.PI) * phi;
+                const phi = Math.acos(-1 + (2 * i) / (rows * cols));
+                const theta = Math.sqrt((rows * cols) * Math.PI) * phi;
                 fragment.position.setFromSphericalCoords(4, phi, theta);
                 fragment.lookAt(0, 0, 0);
                 
                 fragment.userData = { 
-                    homeX: (uIdx - cols/2 + 0.5) * (baseW * 0.995), 
-                    homeY: (vIdx - rows/2 + 0.5) * (baseH * 0.995) 
+                    homeX: (uIdx - cols/2 + 0.5) * (fragW * 1.01), 
+                    homeY: (vIdx - rows/2 + 0.5) * (fragH * 1.01) 
                 };
                 fragments.push(fragment);
                 ballGroup.add(fragment);
             }
-            
             ballGroup.position.z = -150;
             ballGroup.visible = false;
             scene.add(ballGroup);
@@ -155,7 +143,7 @@
 
             generateGrid();
             scene.add(tileGroup);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+            scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('click', onClick);
@@ -163,6 +151,7 @@
             animate();
         }
 
+        // --- REVERTED TO YOUR ORIGINAL TILE LOGIC ---
         function generateGrid() {
             while(tileGroup.children.length > 0) tileGroup.remove(tileGroup.children[0]);
             tiles = [];
@@ -190,10 +179,11 @@
             raycaster.setFromCamera(mouse, camera);
             if (!isWarping) {
                 if (raycaster.intersectObject(namePlane).length > 0) startWarp();
-            } else if (!isResumed) {
-                if (raycaster.intersectObjects(fragments).length > 0) unfoldBall();
             } else {
-                if (raycaster.intersectObjects(fragments).length > 0) flipResume();
+                if (raycaster.intersectObjects(fragments).length > 0) {
+                    if (!isResumed) unfoldBall();
+                    else flipResume();
+                }
             }
         }
 
@@ -207,7 +197,6 @@
                 gsap.to(t.material, { opacity: 0, duration: 1, delay: d + 0.5 });
             });
             starLayers.forEach(l => gsap.to(l.position, { z: 200, duration: 3, ease: "power4.in" }));
-
             setTimeout(() => {
                 ballGroup.visible = true;
                 gsap.to(ballGroup.position, { z: -15, duration: 2.5, ease: "power2.out" });
@@ -217,24 +206,10 @@
         function unfoldBall() {
             isResumed = true;
             isAnimatingFlip = true;
-            
             gsap.to(ballGroup.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
-            gsap.to(ballGroup.position, { 
-                x: 0, y: 0, z: -8, 
-                duration: 2, 
-                ease: "expo.inOut",
-                onComplete: () => isAnimatingFlip = false
-            });
-
+            gsap.to(ballGroup.position, { x: 0, y: 0, z: -8, duration: 2, ease: "expo.inOut", onComplete: () => isAnimatingFlip = false });
             fragments.forEach((f, i) => {
-                gsap.to(f.position, { 
-                    x: f.userData.homeX, 
-                    y: f.userData.homeY, 
-                    z: 0, 
-                    duration: 2, 
-                    delay: i * 0.002, 
-                    ease: "expo.inOut" 
-                });
+                gsap.to(f.position, { x: f.userData.homeX, y: f.userData.homeY, z: 0, duration: 2, delay: i * 0.002, ease: "expo.inOut" });
                 gsap.to(f.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
             });
         }
@@ -243,15 +218,7 @@
             if (isAnimatingFlip) return;
             isAnimatingFlip = true;
             isFlipped = !isFlipped;
-            const targetY = isFlipped ? Math.PI : 0;
-            
-            gsap.to(ballGroup.rotation, { 
-                x: 0, 
-                y: targetY, 
-                duration: 1.2, 
-                ease: "back.inOut(1.2)",
-                onComplete: () => isAnimatingFlip = false
-            });
+            gsap.to(ballGroup.rotation, { y: isFlipped ? Math.PI : 0, duration: 1.2, ease: "back.inOut(1.2)", onComplete: () => isAnimatingFlip = false });
         }
 
         function animate() {
@@ -262,6 +229,7 @@
                     l.position.y = THREE.MathUtils.lerp(l.position.y, mouse.y * (i + 1) * 1.5, 0.05);
                 });
                 const tx = mouse.x * 10, ty = mouse.y * 6;
+                // --- REVERTED TO YOUR ORIGINAL TILE ANIMATION ---
                 tiles.forEach(tile => {
                     const dist = Math.sqrt((tile.position.x - tx)**2 + (tile.position.y - ty)**2);
                     if (dist < 4) {
@@ -274,26 +242,20 @@
                     }
                 });
             }
-
             if (ballGroup.visible && !isResumed) {
                 ballGroup.rotation.y += 0.01;
                 ballGroup.rotation.x += 0.005;
             }
-
             if (isResumed && !isAnimatingFlip) {
                 const flipMod = isFlipped ? -1 : 1;
-                const targetRotX = -mouse.y * 0.15;
-                const targetRotY = (isFlipped ? Math.PI : 0) + (mouse.x * 0.15 * flipMod);
-                ballGroup.rotation.x = THREE.MathUtils.lerp(ballGroup.rotation.x, targetRotX, 0.05);
-                ballGroup.rotation.y = THREE.MathUtils.lerp(ballGroup.rotation.y, targetRotY, 0.05);
+                ballGroup.rotation.x = THREE.MathUtils.lerp(ballGroup.rotation.x, -mouse.y * 0.15, 0.05);
+                ballGroup.rotation.y = THREE.MathUtils.lerp(ballGroup.rotation.y, (isFlipped ? Math.PI : 0) + (mouse.x * 0.15 * flipMod), 0.05);
             }
-
             orbs.forEach(o => {
                 o.data.a += 0.008;
                 o.position.x = Math.cos(o.data.a) * o.data.r;
                 o.position.y = Math.sin(o.data.a * 0.6) * 5;
             });
-
             renderer.render(scene, camera);
         }
         init();
