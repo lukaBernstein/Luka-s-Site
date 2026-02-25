@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA BERNSTEIN | PORTFOLIO</title>
+    <title>LUKA BERNSTEIN | OBSIDIAN UNLOCK</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -22,6 +22,7 @@
         const raycaster = new THREE.Raycaster();
         const tileGroup = new THREE.Group();
 
+        // --- 1. TEXTURE GENERATOR ---
         function createNameTexture(text) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -31,18 +32,19 @@
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.shadowColor = '#ffd700';
-            ctx.shadowBlur = 30; 
+            ctx.shadowBlur = 35;
             ctx.fillStyle = '#ffffff';
             ctx.fillText(text, canvas.width / 2, canvas.height / 2);
             return new THREE.CanvasTexture(canvas);
         }
 
+        // --- 2. AURA GENERATOR (The "Egg") ---
         function createAuraMesh() {
             const canvas = document.createElement('canvas');
             canvas.width = 512; canvas.height = 512;
             const ctx = canvas.getContext('2d');
             const grad = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
-            grad.addColorStop(0, 'rgba(255, 215, 0, 0.6)'); 
+            grad.addColorStop(0, 'rgba(255, 215, 0, 0.65)');
             grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, 512, 512);
@@ -54,7 +56,7 @@
                 blending: THREE.AdditiveBlending, 
                 opacity: 0.3 
             });
-            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(52, 24), mat);
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(54, 25), mat);
             mesh.position.z = -8.2; 
             return mesh;
         }
@@ -204,6 +206,26 @@
 
         function onClick() {
             raycaster.setFromCamera(mouse, camera);
+
+            // Handle Unfolding if arrived
+            if (arrived) {
+                // TRUE enables recursive checking through the group
+                const intersects = raycaster.intersectObjects(artifact.children, true);
+                if (intersects.length > 0 && !isUnfolded) {
+                    isUnfolded = true;
+                    gsap.to(nebula.material, { opacity: 1, duration: 2.5 });
+                    artifact.children.forEach((child, i) => {
+                        if(child.userData.offsetDir) {
+                            const targetPos = child.userData.offsetDir.clone().multiplyScalar(8);
+                            gsap.to(child.position, { x: targetPos.x, y: targetPos.y, z: targetPos.z, duration: 3, ease: "power4.out", delay: i * 0.01 });
+                            gsap.to(child.rotation, { x: Math.random() * 6, y: Math.random() * 6, duration: 4 });
+                        }
+                    });
+                    return;
+                }
+            }
+
+            // Handle Initial Warp
             if (!isWarping && raycaster.intersectObject(namePlane).length > 0) {
                 isWarping = true;
                 gsap.to([namePlane.scale, glowPlane.scale], { x: 3, y: 0.1, duration: 0.8, ease: "power4.in" });
@@ -235,19 +257,15 @@
             requestAnimationFrame(animate);
             renderer.render(scene, camera);
             
+            // BREATHING EFFECT LOGIC
             if (namePlane && !isWarping) {
                 const time = Date.now() * 0.0022; 
                 const breath = (Math.sin(time) + 1) / 2; 
                 
-                // Pulsing color shift
                 namePlane.material.color.setRGB(1.0, 0.8 + (0.15 * breath), 0.35 + (0.5 * breath));
-                
-                // Pulsing aura shift
                 glowPlane.material.opacity = 0.1 + (0.5 * breath); 
                 const s = 1.0 + (breath * 0.1); 
                 glowPlane.scale.set(s, s, 1);
-
-                // Pulsing light shift
                 nameLight.intensity = 180 + (breath * 270); 
             }
 
@@ -284,6 +302,10 @@
                 artifact.rotation.y += 0.002;
                 artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 0.4, 0.05);
                 artifact.rotation.y += mouse.x * 0.01;
+                if (isUnfolded) {
+                    nebula.rotation.y += 0.001;
+                    nebula.rotation.z += 0.001;
+                }
             }
 
             orbs.forEach(o => {
