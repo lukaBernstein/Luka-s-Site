@@ -53,7 +53,7 @@
             canvas.width = 2048; canvas.height = 512;
             ctx.font = '500 180px "Times New Roman"';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.shadowColor = '#ffcc00'; ctx.shadowBlur = 32; 
+            ctx.shadowColor = '#ffcc00'; ctx.shadowBlur = 38; // Slightly more bloom in texture
             ctx.fillStyle = '#ffffff';
             ctx.fillText(text, canvas.width / 2, canvas.height / 2);
             return new THREE.CanvasTexture(canvas);
@@ -64,10 +64,10 @@
             canvas.width = 512; canvas.height = 512;
             const ctx = canvas.getContext('2d');
             const grad = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
-            grad.addColorStop(0, 'rgba(255, 200, 50, 0.48)'); 
+            grad.addColorStop(0, 'rgba(255, 200, 50, 0.55)'); 
             grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
             ctx.fillStyle = grad; ctx.fillRect(0, 0, 512, 512);
-            const mat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, blending: THREE.AdditiveBlending, opacity: 0.37 });
+            const mat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, blending: THREE.AdditiveBlending, opacity: 0.42 });
             const mesh = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), mat);
             mesh.position.z = -8.2; return mesh;
         }
@@ -149,7 +149,7 @@
                 transparent: true, 
                 color: 0xffd966, 
                 emissive: 0xffaa00,
-                emissiveIntensity: 0.48, 
+                emissiveIntensity: 0.45, 
                 roughness: 0.1, 
                 metalness: 0.8 
             });
@@ -158,11 +158,11 @@
             
             glowPlane = createAuraMesh(); scene.add(glowPlane);
             
-            nameLight = new THREE.PointLight(0xffcc00, 260, 60); 
+            nameLight = new THREE.PointLight(0xffcc00, 280, 60); 
             nameLight.position.set(0, 0, -4.5); 
             scene.add(nameLight);
 
-            sweepLight = new THREE.PointLight(0xffffff, 850, 45);
+            sweepLight = new THREE.PointLight(0xffffff, 880, 45);
             sweepLight.position.set(-20, 10, -5);
             scene.add(sweepLight);
 
@@ -268,12 +268,12 @@
                 sweepLight.position.x = pingPong * 28; 
                 sweepLight.position.y = -pingPong * 10; 
                 
-                // 5% increase on breath range
-                const breath = 0.42 + ((Math.sin(timeNow * 2.2) + 1) / 2) * 0.32; 
-                glowPlane.material.opacity = 0.27 + (0.22 * breath); 
-                glowPlane.scale.set(1.06 + (breath * 0.06), 1.06 + (breath * 0.06), 1);
-                nameLight.intensity = 215 + (breath * 135); 
-                namePlane.material.emissiveIntensity = 0.42 + (breath * 0.28);
+                // Breath logic: 5% more intensity added to the "inhale" peak
+                const breath = 0.45 + ((Math.sin(timeNow * 2.2) + 1) / 2) * 0.40; 
+                glowPlane.material.opacity = 0.3 + (0.28 * breath); 
+                glowPlane.scale.set(1.08 + (breath * 0.07), 1.08 + (breath * 0.07), 1);
+                nameLight.intensity = 230 + (breath * 165); 
+                namePlane.material.emissiveIntensity = 0.45 + (breath * 0.38);
 
                 const tx = mouse.x * 10, ty = mouse.y * 6;
                 tiles.forEach(tile => {
