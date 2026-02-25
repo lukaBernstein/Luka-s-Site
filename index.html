@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA BERNSTEIN | INFINITE STARS</title>
+    <title>LUKA BERNSTEIN | SEAMLESS WARP</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -15,7 +15,7 @@
 
     <script>
         let scene, camera, renderer, tiles = [], starObjects = [], orbs = [], namePlane;
-        let artifact, isWarping = false, warpComplete = false;
+        let artifact, isWarping = false, starContainer;
         
         const mouse = new THREE.Vector2(-10, -10); 
         const raycaster = new THREE.Raycaster();
@@ -42,29 +42,43 @@
             return tex;
         }
 
+        // NEW: Spherical distribution to remove the "Square" artifact
+        function getRandomSpherePoint(radius) {
+            const u = Math.random();
+            const v = Math.random();
+            const theta = 2 * Math.PI * u;
+            const phi = Math.acos(2 * v - 1);
+            const x = radius * Math.sin(phi) * Math.cos(theta);
+            const y = radius * Math.sin(phi) * Math.sin(theta);
+            const z = radius * Math.cos(phi);
+            return { x, y, z };
+        }
+
         function initStars() {
+            starContainer = new THREE.Group();
+            scene.add(starContainer);
+
             const starGeo = new THREE.SphereGeometry(0.12, 8, 8);
             const starMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            for(let i=0; i<2500; i++) {
+            
+            for(let i=0; i<3000; i++) {
                 const star = new THREE.Mesh(starGeo, starMat);
-                // Wide distribution to ensure they surround the knot later
-                star.position.set(
-                    (Math.random() - 0.5) * 400, 
-                    (Math.random() - 0.5) * 300, 
-                    (Math.random() * -600) 
-                );
+                // Spread stars in a sphere instead of a cube
+                const point = getRandomSpherePoint(Math.random() * 400 + 100);
+                star.position.set(point.x, point.y, point.z - 200);
+                
                 star.userData = { 
                     speed: Math.random() * 0.2 + 0.1,
-                    originalPos: star.position.clone()
+                    radius: Math.sqrt(point.x*point.x + point.y*point.y) // for parallax
                 };
                 starObjects.push(star);
-                scene.add(star);
+                starContainer.add(star);
             }
         }
 
         function init() {
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
             camera.position.z = 10;
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -146,25 +160,19 @@
                 
                 tiles.forEach(t => {
                     const d = Math.random() * 0.3;
-                    gsap.to(t.position, { z: 50, x: t.position.x * 3, y: t.position.y * 3, duration: 1.5, delay: d, ease: "power2.in" });
+                    gsap.to(t.position, { z: 50, x: t.position.x * 4, y: t.position.y * 4, duration: 1.5, delay: d, ease: "power2.in" });
                     gsap.to(t.material, { opacity: 0, duration: 1, delay: d + 0.5 });
                 });
 
-                // STRETCH STARS
                 starObjects.forEach(s => {
-                    gsap.to(s.scale, { z: 80, duration: 1, ease: "power2.in" });
-                    // Rapid speed up
-                    gsap.to(s.position, { z: s.position.z + 400, duration: 2.5, ease: "power2.in", onComplete: () => {
-                        // After warp, reset stars to surround the knot and return to normal scale
-                        warpComplete = true;
-                        s.scale.set(1, 1, 1);
-                        s.position.z = (Math.random() - 0.5) * 400 - 50; 
-                    }});
+                    gsap.to(s.scale, { z: 65, duration: 1.2, ease: "power2.in" });
+                    gsap.to(s.position, { z: s.position.z + 500, duration: 3, ease: "power3.in" });
+                    gsap.to(s.scale, { z: 1, duration: 1, delay: 2.8, ease: "power2.out" });
                 });
 
                 setTimeout(() => {
                     artifact.visible = true;
-                    gsap.to(artifact.position, { z: -12, duration: 3.5, ease: "power3.out" });
+                    gsap.to(artifact.position, { z: -12, duration: 4, ease: "expo.out" });
                 }, 800);
             }
         }
@@ -173,16 +181,17 @@
             requestAnimationFrame(animate);
             
             starObjects.forEach(s => {
-                if(!isWarping) {
-                    s.position.z += s.userData.speed;
-                    if(s.position.z > 15) s.position.z = -500;
-                } else if (warpComplete) {
-                    // Subtle drifting after warp
-                    s.position.z += 0.05;
-                    if(s.position.z > 50) s.position.z = -200;
-                    s.rotation.y += 0.001;
+                s.position.z += s.userData.speed;
+                // Seamless recycling logic with spherical re-randomization
+                if(s.position.z > 50) {
+                    const point = getRandomSpherePoint(Math.random() * 400 + 200);
+                    s.position.set(point.x, point.y, -800);
                 }
             });
+
+            if(isWarping) {
+                starContainer.rotation.y += 0.0003;
+            }
 
             if (!isWarping) {
                 const tx = mouse.x * 10, ty = mouse.y * 6;
@@ -219,7 +228,6 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            generateGrid();
         }
 
         init();
