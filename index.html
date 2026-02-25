@@ -13,7 +13,7 @@
 </head>
 <body>
     <script>
-        let scene, camera, renderer, tiles = [], starObjects = [], orbs = [], namePlane, glowPlane, nameLight;
+        let scene, camera, renderer, tiles = [], starObjects = [], orbs = [], namePlane, glowPlane, nameLight, sweepLight;
         let artifact, nebula, buttonBox, isWarping = false, arrived = false, isUnfolded = false, isSpelling = false;
         let warpProgress = 0, mainGroup;
         
@@ -53,7 +53,7 @@
             canvas.width = 2048; canvas.height = 512;
             ctx.font = '500 180px "Times New Roman"';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 35;
+            ctx.shadowColor = '#ffcc00'; ctx.shadowBlur = 32; 
             ctx.fillStyle = '#ffffff';
             ctx.fillText(text, canvas.width / 2, canvas.height / 2);
             return new THREE.CanvasTexture(canvas);
@@ -64,10 +64,11 @@
             canvas.width = 512; canvas.height = 512;
             const ctx = canvas.getContext('2d');
             const grad = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
-            grad.addColorStop(0, 'rgba(255, 215, 0, 0.65)'); grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            grad.addColorStop(0, 'rgba(255, 200, 50, 0.48)'); 
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
             ctx.fillStyle = grad; ctx.fillRect(0, 0, 512, 512);
-            const mat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, blending: THREE.AdditiveBlending, opacity: 0.3 });
-            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(54, 25), mat);
+            const mat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, blending: THREE.AdditiveBlending, opacity: 0.37 });
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), mat);
             mesh.position.z = -8.2; return mesh;
         }
 
@@ -86,7 +87,7 @@
                 pos[i*3+2] = r * Math.cos(phi);
                 const t = targets[i % targets.length];
                 targetAttr[i*3] = t.x; targetAttr[i*3+1] = t.y; targetAttr[i*3+2] = 0;
-                colors[i*3] = 1.0; colors[i*3+1] = 0.84; colors[i*3+2] = 0.2;
+                colors[i*3] = 1.0; colors[i*3+1] = 0.95; colors[i*3+2] = 0.6;
             }
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             geo.setAttribute('target', new THREE.BufferAttribute(targetAttr, 3));
@@ -143,17 +144,34 @@
                 starObjects.push(star); mainGroup.add(star);
             }
 
-            namePlane = new THREE.Mesh(new THREE.PlaneGeometry(35, 10), new THREE.MeshBasicMaterial({ map: createNameTexture('LUKA BERNSTEIN'), transparent: true, color: 0xffd700 }));
+            const nameMat = new THREE.MeshStandardMaterial({ 
+                map: createNameTexture('LUKA BERNSTEIN'), 
+                transparent: true, 
+                color: 0xffd966, 
+                emissive: 0xffaa00,
+                emissiveIntensity: 0.48, 
+                roughness: 0.1, 
+                metalness: 0.8 
+            });
+            namePlane = new THREE.Mesh(new THREE.PlaneGeometry(35, 10), nameMat);
             namePlane.position.z = -8; scene.add(namePlane);
+            
             glowPlane = createAuraMesh(); scene.add(glowPlane);
-            nameLight = new THREE.PointLight(0xffd700, 250, 55); nameLight.position.set(0, 0, -4.5); scene.add(nameLight);
+            
+            nameLight = new THREE.PointLight(0xffcc00, 260, 60); 
+            nameLight.position.set(0, 0, -4.5); 
+            scene.add(nameLight);
+
+            sweepLight = new THREE.PointLight(0xffffff, 850, 45);
+            sweepLight.position.set(-20, 10, -5);
+            scene.add(sweepLight);
 
             artifact = createObsidianPolyhedron();
             nebula = createNebula(); artifact.add(nebula);
             artifact.position.z = -1000; artifact.visible = false; mainGroup.add(artifact);
 
             const boxGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(24, 8));
-            buttonBox = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0 }));
+            buttonBox = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({ color: 0xffd966, transparent: true, opacity: 0 }));
             buttonBox.position.set(0, 0.2, 0.5); nebula.add(buttonBox);
 
             const configs = [
@@ -171,7 +189,7 @@
             });
 
             generateGrid(); scene.add(tileGroup);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+            scene.add(new THREE.AmbientLight(0xffffff, 0.45)); 
 
             window.addEventListener('mousemove', (e) => { mouse.x = (e.clientX/window.innerWidth)*2-1; mouse.y = -(e.clientY/window.innerHeight)*2+1; });
             window.addEventListener('click', onClick);
@@ -190,7 +208,7 @@
             const rg = Math.ceil(h / spacing) + 8;
             for (let x = -cg/2; x < cg/2; x++) {
                 for (let y = -rg/2; y < rg/2; y++) {
-                    const tile = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, metalness: 1.0, roughness: 0.05 }));
+                    const tile = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, metalness: 1.0, roughness: 0.05 }));
                     tile.position.set(x * spacing, y * spacing, 0);
                     tile.scale.set(1, 1, 0.2); 
                     tileGroup.add(tile); tiles.push(tile);
@@ -225,7 +243,7 @@
             if (!isWarping && raycaster.intersectObject(namePlane).length > 0) {
                 isWarping = true;
                 gsap.to([namePlane.scale, glowPlane.scale], { x: 3, y: 0.1, duration: 0.8, ease: "power4.in" });
-                gsap.to([namePlane.material, glowPlane.material, nameLight], { opacity: 0, intensity: 0, duration: 0.8 });
+                gsap.to([namePlane.material, glowPlane.material, nameLight, sweepLight], { opacity: 0, intensity: 0, duration: 0.8 });
                 tiles.forEach(t => {
                     const d = Math.random() * 0.3;
                     gsap.to(t.position, { z: 50, x: t.position.x * 5, y: t.position.y * 5, duration: 1.5, delay: d, ease: "power2.in" });
@@ -246,11 +264,16 @@
             const timeNow = Date.now() * 0.001;
             
             if (namePlane && !isWarping) {
-                const breath = (Math.sin(timeNow * 2.2) + 1) / 2; 
-                namePlane.material.color.setRGB(1.0, 0.8 + (0.15 * breath), 0.35 + (0.5 * breath));
-                glowPlane.material.opacity = 0.1 + (0.5 * breath); 
-                glowPlane.scale.set(1.0 + (breath * 0.1), 1.0 + (breath * 0.1), 1);
-                nameLight.intensity = 180 + (breath * 270); 
+                const pingPong = Math.sin(timeNow * 1.2); 
+                sweepLight.position.x = pingPong * 28; 
+                sweepLight.position.y = -pingPong * 10; 
+                
+                // 5% increase on breath range
+                const breath = 0.42 + ((Math.sin(timeNow * 2.2) + 1) / 2) * 0.32; 
+                glowPlane.material.opacity = 0.27 + (0.22 * breath); 
+                glowPlane.scale.set(1.06 + (breath * 0.06), 1.06 + (breath * 0.06), 1);
+                nameLight.intensity = 215 + (breath * 135); 
+                namePlane.material.emissiveIntensity = 0.42 + (breath * 0.28);
 
                 const tx = mouse.x * 10, ty = mouse.y * 6;
                 tiles.forEach(tile => {
@@ -258,10 +281,10 @@
                     if (d < 4) {
                         const f = (4 - d) / 4;
                         tile.position.z = THREE.MathUtils.lerp(tile.position.z, f * 3, 0.1);
-                        tile.material.opacity = 0.35 + (f * 0.3);
+                        tile.material.opacity = 0.4 + (f * 0.3);
                     } else {
                         tile.position.z = THREE.MathUtils.lerp(tile.position.z, 0, 0.08);
-                        tile.material.opacity = 0.35;
+                        tile.material.opacity = 0.4;
                     }
                 });
             }
@@ -284,7 +307,7 @@
                     posAttr.array[i*3+2] = THREE.MathUtils.lerp(posAttr.array[i*3+2], tarAttr.array[i*3+2], 0.04);
                     const wave = Math.sin(i * 0.8 + timeNow * 8.0);
                     const flash = Math.pow(Math.max(0, wave), 8) * 1.5; 
-                    colAttr.array[i*3] = 1.0 * (0.02 + flash); colAttr.array[i*3+1] = 0.82 * (0.02 + flash); colAttr.array[i*3+2] = 0.25 * (0.02 + flash);
+                    colAttr.array[i*3] = 1.0 * (0.02 + flash); colAttr.array[i*3+1] = 0.92 * (0.02 + flash); colAttr.array[i*3+2] = 0.5 * (0.02 + flash);
                 }
                 posAttr.needsUpdate = true; colAttr.needsUpdate = true;
                 nebula.rotation.set(-artifact.rotation.x, -artifact.rotation.y, -artifact.rotation.z);
@@ -306,21 +329,14 @@
             orbs.forEach(o => {
                 o.data.a += o.data.speed;
                 let t = isWarping ? warpProgress : 0;
-                
-                // Radius expands slightly during warp
                 let currentR = THREE.MathUtils.lerp(o.data.r, o.data.r + 5, t);
-                
                 if(o.data.type === 'v') {
-                    // VERTICAL ORBIT: Loops Y and Z axes
-                    // This swings between Z = -25 (behind) and Z = 5 (in front of glass)
-                    o.position.x = Math.sin(o.data.a * 0.3) * 3; // Slight drift
+                    o.position.x = Math.sin(o.data.a * 0.3) * 3; 
                     o.position.y = Math.cos(o.data.a) * currentR;
                     o.position.z = THREE.MathUtils.lerp(-8, -15, t) + (Math.sin(o.data.a) * (currentR * 1.2));
                 } else {
-                    // HORIZONTAL ORBIT: Loops X and Z axes
-                    // This circles the nameplate, passing behind and then in front
                     o.position.x = Math.cos(o.data.a) * currentR;
-                    o.position.y = Math.sin(o.data.a * 0.5) * 4; // Slight vertical wave
+                    o.position.y = Math.sin(o.data.a * 0.5) * 4; 
                     o.position.z = THREE.MathUtils.lerp(-8, -15, t) + (Math.sin(o.data.a) * (currentR * 1.1));
                 }
             });
