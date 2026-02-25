@@ -3,195 +3,177 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LUKA | RESTORED & ALIGNED</title>
+<title>LUKA | FIXED</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 <style>
-    body { margin: 0; background: #000; overflow: hidden; cursor: crosshair; }
-    canvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: block; }
+body { margin:0; background:#000; overflow:hidden; }
+canvas { display:block; }
 </style>
 </head>
 <body>
 
 <script>
 
-let scene, camera, renderer, tiles = [], starLayers = [], orbs = [], namePlane;
+let scene, camera, renderer;
 let ballGroup, fragments = [];
-let isWarping = false, isResumed = false, isFlipped = false;
-const mouse = new THREE.Vector2(-10, -10);
-const raycaster = new THREE.Raycaster();
-const tileGroup = new THREE.Group();
+let isResumed = false;
 
-const loader = new THREE.TextureLoader();
-const resumeTex = loader.load('resume_front.jpg');
-const backTex = loader.load('resume_back.jpg');
-
-// GRID
 const rows = 12;
 const cols = 10;
 const fragCount = rows * cols;
 
-function createTextTexture(text) {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = 2048;
-    canvas.height = 1024;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.font = '500 550px "Times New Roman", Times, serif';
-    ctx.fillStyle = '#ffefba';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = '#ffd700';
-    ctx.shadowBlur = 45;
-    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-    return new THREE.CanvasTexture(canvas);
-}
+const loader = new THREE.TextureLoader();
+const resumeTex = loader.load('resume_front.jpg');
+const backTex   = loader.load('resume_back.jpg');
 
-function addStars(count, size, depth, opacity = 0.7) {
-    const starGeo = new THREE.BufferGeometry();
-    const starPos = new Float32Array(count * 3);
-    for(let i=0; i<count*3; i++) starPos[i] = (Math.random() - 0.5) * 600;
-    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-    const starMat = new THREE.PointsMaterial({ size, color: 0xffffff, transparent: true, opacity });
-    const points = new THREE.Points(starGeo, starMat);
-    points.position.z = depth;
-    scene.add(points);
-    return points;
-}
+init();
+animate();
 
 function init() {
 
-    scene = new THREE.Scene();
+scene = new THREE.Scene();
 
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 10;
+camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.z = 14;
 
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    document.body.appendChild(renderer.domElement);
+renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+document.body.appendChild(renderer.domElement);
 
-    starLayers.push(addStars(4000, 0.15, -80));
-    starLayers.push(addStars(1500, 0.3, -40));
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
-    namePlane = new THREE.Mesh(
-        new THREE.PlaneGeometry(24, 12),
-        new THREE.MeshStandardMaterial({
-            map: createTextTexture('LUKA'),
-            transparent: true,
-            emissive: 0xffd700,
-            emissiveIntensity: 1.8
-        })
+ballGroup = new THREE.Group();
+scene.add(ballGroup);
+
+/* -------- IMAGE DIMENSIONS -------- */
+
+const imageRatio = 1650 / 1275; // YOUR ACTUAL IMAGE RATIO
+
+const totalWidth = 10;
+const totalHeight = totalWidth * imageRatio;
+
+const fragWidth = totalWidth / cols;
+const fragHeight = totalHeight / rows;
+
+/* -------- CRITICAL FIX -------- */
+/* We use repeat + offset instead of editing UVs */
+
+resumeTex.wrapS = THREE.ClampToEdgeWrapping;
+resumeTex.wrapT = THREE.ClampToEdgeWrapping;
+
+backTex.wrapS = THREE.ClampToEdgeWrapping;
+backTex.wrapT = THREE.ClampToEdgeWrapping;
+
+for (let v = 0; v < rows; v++) {
+for (let u = 0; u < cols; u++) {
+
+    const fragContainer = new THREE.Group();
+
+    /* ---------- FRONT ---------- */
+
+    const frontTex = resumeTex.clone();
+    frontTex.repeat.set(1/cols, 1/rows);
+    frontTex.offset.set(u/cols, 1 - (v+1)/rows);
+
+    const meshFront = new THREE.Mesh(
+        new THREE.PlaneGeometry(fragWidth, fragHeight),
+        new THREE.MeshStandardMaterial({ map: frontTex })
     );
-    namePlane.position.z = -8;
-    scene.add(namePlane);
 
-    ballGroup = new THREE.Group();
+    /* ---------- BACK ---------- */
 
-    // ---------- IMAGE RATIO FIX ----------
-    const imageRatio = 1650 / 1275; // your actual image ratio
+    const backTextureClone = backTex.clone();
+    backTextureClone.repeat.set(-1/cols, 1/rows);   // mirror horizontally
+    backTextureClone.offset.set((u+1)/cols, 1 - (v+1)/rows);
 
-    const totalWidth = 12;
-    const totalHeight = totalWidth * imageRatio;
+    const meshBack = new THREE.Mesh(
+        new THREE.PlaneGeometry(fragWidth, fragHeight),
+        new THREE.MeshStandardMaterial({ map: backTextureClone })
+    );
 
-    const fragWidth = totalWidth / cols;
-    const fragHeight = totalHeight / rows;
+    meshBack.rotation.y = Math.PI;
+    meshBack.position.z = -0.01;
 
-    for (let i = 0; i < fragCount; i++) {
+    fragContainer.add(meshFront);
+    fragContainer.add(meshBack);
 
-        const fragContainer = new THREE.Group();
+    /* -------- START AS BALL -------- */
 
-        const u = i % cols;
-        const v = Math.floor(i / cols);
+    const i = v * cols + u;
+    const phi = Math.acos(-1 + (2 * i) / fragCount);
+    const theta = Math.sqrt(fragCount * Math.PI) * phi;
 
-        // FRONT
-        const geoFront = new THREE.PlaneGeometry(fragWidth, fragHeight);
-        const uvF = geoFront.attributes.uv;
+    fragContainer.position.setFromSphericalCoords(4, phi, theta);
+    fragContainer.lookAt(0,0,0);
 
-        for (let j = 0; j < uvF.count; j++) {
-            const uVal = (uvF.getX(j) + u) / cols;
-            const vVal = (uvF.getY(j) + v) / rows;
-            uvF.setXY(j, uVal, vVal);
-        }
+    /* -------- PERFECT CENTERED GRID -------- */
 
-        const meshFront = new THREE.Mesh(
-            geoFront,
-            new THREE.MeshStandardMaterial({
-                map: resumeTex,
-                roughness: 0.3,
-                metalness: 0.2
-            })
-        );
+    fragContainer.userData = {
+        homeX: (u - cols/2 + 0.5) * fragWidth,
+        homeY: (rows/2 - v - 0.5) * fragHeight
+    };
 
-        // BACK (clean mirror)
-        const geoBack = new THREE.PlaneGeometry(fragWidth, fragHeight);
-        const uvB = geoBack.attributes.uv;
+    fragments.push(fragContainer);
+    ballGroup.add(fragContainer);
+}
+}
 
-        for (let j = 0; j < uvB.count; j++) {
-            const uVal = (uvB.getX(j) + u) / cols;
-            const vVal = (uvB.getY(j) + v) / rows;
-            uvB.setXY(j, 1 - uVal, vVal);
-        }
+ballGroup.position.z = -30;
 
-        const meshBack = new THREE.Mesh(
-            geoBack,
-            new THREE.MeshStandardMaterial({
-                map: backTex,
-                roughness: 0.3,
-                metalness: 0.2
-            })
-        );
+window.addEventListener('click', unfold);
 
-        meshBack.rotation.y = Math.PI;
-        meshBack.position.z = -0.01;
+window.addEventListener('resize', onResize);
+}
 
-        fragContainer.add(meshFront);
-        fragContainer.add(meshBack);
+function unfold() {
 
-        // SPHERE START
-        const phi = Math.acos(-1 + (2 * i) / fragCount);
-        const theta = Math.sqrt(fragCount * Math.PI) * phi;
-        fragContainer.position.setFromSphericalCoords(4, phi, theta);
-        fragContainer.lookAt(0, 0, 0);
+if (isResumed) return;
+isResumed = true;
 
-        // CENTERED GRID POSITION
-        fragContainer.userData = {
-            homeX: (u - cols / 2 + 0.5) * fragWidth,
-            homeY: (rows / 2 - v - 0.5) * fragHeight
-        };
+fragments.forEach((f, i) => {
 
-        fragments.push(fragContainer);
-        ballGroup.add(fragContainer);
-    }
+    gsap.to(f.position, {
+        x: f.userData.homeX,
+        y: f.userData.homeY,
+        z: 0,
+        duration: 1.8,
+        delay: i * 0.002,
+        ease: "expo.inOut"
+    });
 
-    ballGroup.position.z = -150;
-    ballGroup.visible = false;
-    scene.add(ballGroup);
+    gsap.to(f.rotation, {
+        x: 0,
+        y: 0,
+        z: 0,
+        duration: 1.8,
+        ease: "expo.inOut"
+    });
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.2));
+});
 
-    window.addEventListener('resize', onResize);
-    animate();
+gsap.to(ballGroup.position, { z: -8, duration: 2 });
+gsap.to(ballGroup.rotation, { x:0, y:0, z:0, duration:2 });
+
 }
 
 function animate() {
-    requestAnimationFrame(animate);
+requestAnimationFrame(animate);
 
-    if (ballGroup.visible) {
-        ballGroup.rotation.y += 0.01;
-        ballGroup.rotation.x += 0.005;
-    }
-
-    renderer.render(scene, camera);
+if (!isResumed) {
+    ballGroup.rotation.y += 0.01;
+    ballGroup.rotation.x += 0.005;
 }
 
-function onResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.render(scene, camera);
 }
 
-init();
+function onResize(){
+camera.aspect = window.innerWidth/window.innerHeight;
+camera.updateProjectionMatrix();
+renderer.setSize(window.innerWidth, window.innerHeight);
+}
 
 </script>
 </body>
