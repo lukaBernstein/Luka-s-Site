@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA | SOLID CARD FIX</title>
+    <title>LUKA | RESTORED & ALIGNED</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -22,12 +22,12 @@
         const tileGroup = new THREE.Group();
 
         const loader = new THREE.TextureLoader();
-        // Force refresh for GitHub cache
-        const resumeTex = loader.load('resume_front.jpg?v=2'); 
-        const backTex = loader.load('resume_back.jpg?v=2');
+        const resumeTex = loader.load('resume_front.jpg'); 
+        const backTex = loader.load('resume_back.jpg');
 
+        // --- ASPECT RATIO MATH ---
         const rows = 12, cols = 10; 
-        const IMAGE_ASPECT = 1650 / 1275; 
+        const IMAGE_ASPECT = 1650 / 1275; // 1.294
         const baseW = 1.2;
         const baseH = baseW * IMAGE_ASPECT; 
 
@@ -77,65 +77,48 @@
             ballGroup = new THREE.Group();
 
             for (let i = 0; i < rows * cols; i++) {
+                const fragContainer = new THREE.Group();
                 const uIdx = i % cols;
                 const vIdx = Math.floor(i / cols);
 
-                // --- CREATING A BOX WITH THICKNESS (0.04) ---
-                const geo = new THREE.BoxGeometry(baseW / cols, baseH / rows, 0.04);
-                
-                // Front and Back Materials
-                const mats = [
-                    new THREE.MeshStandardMaterial({ color: 0x333333 }), // side
-                    new THREE.MeshStandardMaterial({ color: 0x333333 }), // side
-                    new THREE.MeshStandardMaterial({ color: 0x333333 }), // side
-                    new THREE.MeshStandardMaterial({ color: 0x333333 }), // side
-                    new THREE.MeshStandardMaterial({ map: resumeTex }),  // front
-                    new THREE.MeshStandardMaterial({ map: backTex })    // back
-                ];
+                // --- TEXTURE MATH (Top-Down) ---
+                const uS = uIdx / cols;
+                const uE = (uIdx + 1) / cols;
+                const vS = (rows - 1 - vIdx) / rows;
+                const vE = (rows - vIdx) / rows;
 
-                const frag = new THREE.Mesh(geo, mats);
+                // Front Plane
+                const geoF = new THREE.PlaneGeometry(baseW / cols, baseH / rows);
+                const uvF = geoF.attributes.uv;
+                uvF.setXY(0, uS, vE); uvF.setXY(1, uE, vE); uvF.setXY(2, uS, vS); uvF.setXY(3, uE, vS);
+                const meshF = new THREE.Mesh(geoF, new THREE.MeshStandardMaterial({ map: resumeTex, side: THREE.DoubleSide }));
+                meshF.position.z = 0.01;
 
-                // UV MAPPING FOR BOX FACES
-                const uvAttr = geo.attributes.uv;
-                
-                // Front Face (Index 4 in BoxGeometry)
-                const fU0 = uIdx / cols;
-                const fU1 = (uIdx + 1) / cols;
-                const fV0 = (rows - 1 - vIdx) / rows;
-                const fV1 = (rows - vIdx) / rows;
+                // Back Plane (Mirrored U)
+                const geoB = new THREE.PlaneGeometry(baseW / cols, baseH / rows);
+                const uvB = geoB.attributes.uv;
+                const uS_B = (cols - uIdx) / cols;
+                const uE_B = (cols - 1 - uIdx) / cols;
+                uvB.setXY(0, uS_B, vE); uvB.setXY(1, uE_B, vE); uvB.setXY(2, uS_B, vS); uvB.setXY(3, uE_B, vS);
+                const meshB = new THREE.Mesh(geoB, new THREE.MeshStandardMaterial({ map: backTex, side: THREE.DoubleSide }));
+                meshB.rotation.y = Math.PI;
+                meshB.position.z = -0.01;
 
-                // Set UVs for the Front Face (8 vertices for that face usually)
-                // We target the specific range for the Front and Back faces
-                const updateFaceUVs = (faceIdx, u0, u1, v0, v1) => {
-                    const offset = faceIdx * 4;
-                    uvAttr.setXY(offset, u0, v1);
-                    uvAttr.setXY(offset + 1, u1, v1);
-                    uvAttr.setXY(offset + 2, u0, v0);
-                    uvAttr.setXY(offset + 3, u1, v0);
-                };
-
-                // Front (Face 4)
-                updateFaceUVs(4, fU0, fU1, fV0, fV1);
-                
-                // Back (Face 5) - Mirroring the Horizontal
-                const bU0 = (cols - uIdx) / cols;
-                const bU1 = (cols - 1 - uIdx) / cols;
-                updateFaceUVs(5, bU0, bU1, fV0, fV1);
+                fragContainer.add(meshF);
+                fragContainer.add(meshB);
 
                 const phi = Math.acos(-1 + (2 * i) / (rows * cols));
                 const theta = Math.sqrt((rows * cols) * Math.PI) * phi;
-                frag.position.setFromSphericalCoords(4, phi, theta);
-                frag.lookAt(0, 0, 0);
+                fragContainer.position.setFromSphericalCoords(4, phi, theta);
+                fragContainer.lookAt(0, 0, 0);
                 
-                frag.userData = { 
-                    homeX: (uIdx - cols/2 + 0.5) * (baseW/cols * cols * 0.1), // Placeholder for calc
-                    homeY: ((rows - 1 - vIdx) - rows/2 + 0.5) * (baseH/rows * rows * 0.1),
-                    gridX: (uIdx - cols/2 + 0.5) * (baseW/cols * 1.01),
-                    gridY: ((rows - 1 - vIdx) - rows/2 + 0.5) * (baseH/rows * 1.01)
+                fragContainer.userData = { 
+                    homeX: (uIdx - cols/2 + 0.5) * (baseW / cols * 1.01),
+                    homeY: ((rows - 1 - vIdx) - rows/2 + 0.5) * (baseH / rows * 1.01)
                 };
                 
-                fragments.push(frag);
-                ballGroup.add(frag);
+                fragments.push(fragContainer);
+                ballGroup.add(fragContainer);
             }
             
             ballGroup.position.z = -150;
@@ -153,7 +136,7 @@
 
             generateGrid();
             scene.add(tileGroup);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('click', onClick);
@@ -161,6 +144,7 @@
             animate();
         }
 
+        // --- RESTORED INTRO GRID ---
         function generateGrid() {
             while(tileGroup.children.length > 0) tileGroup.remove(tileGroup.children[0]);
             tiles = [];
@@ -172,7 +156,7 @@
             const rg = Math.ceil(h / spacing) + 8;
             for (let x = -cg/2; x < cg/2; x++) {
                 for (let y = -rg/2; y < rg/2; y++) {
-                    const tile = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 }));
+                    const tile = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, metalness: 0.9 }));
                     tile.position.set(x * spacing, y * spacing, 0);
                     tileGroup.add(tile); tiles.push(tile);
                 }
@@ -188,10 +172,13 @@
             raycaster.setFromCamera(mouse, camera);
             if (!isWarping) {
                 if (raycaster.intersectObject(namePlane).length > 0) startWarp();
-            } else if (!isResumed) {
-                if (raycaster.intersectObjects(fragments).length > 0) unfoldBall();
             } else {
-                if (raycaster.intersectObjects(fragments).length > 0) flipResume();
+                // Fixed clicking for fragments
+                const intersects = raycaster.intersectObjects(ballGroup.children, true);
+                if (intersects.length > 0) {
+                    if (!isResumed) unfoldBall();
+                    else flipResume();
+                }
             }
         }
 
@@ -214,10 +201,9 @@
         function unfoldBall() {
             isResumed = true;
             isAnimatingFlip = true;
-            gsap.to(ballGroup.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
             gsap.to(ballGroup.position, { x: 0, y: 0, z: -8, duration: 2, ease: "expo.inOut", onComplete: () => isAnimatingFlip = false });
             fragments.forEach((f, i) => {
-                gsap.to(f.position, { x: f.userData.gridX, y: f.userData.gridY, z: 0, duration: 2, delay: i * 0.002, ease: "expo.inOut" });
+                gsap.to(f.position, { x: f.userData.homeX, y: f.userData.homeY, z: 0, duration: 2, delay: i * 0.002, ease: "expo.inOut" });
                 gsap.to(f.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
             });
         }
@@ -243,8 +229,9 @@
                 ballGroup.rotation.x += 0.005;
             }
             if (isResumed && !isAnimatingFlip) {
+                const flipMod = isFlipped ? -1 : 1;
                 ballGroup.rotation.x = THREE.MathUtils.lerp(ballGroup.rotation.x, -mouse.y * 0.15, 0.05);
-                ballGroup.rotation.y = THREE.MathUtils.lerp(ballGroup.rotation.y, (isFlipped ? Math.PI : 0) + (mouse.x * 0.15 * (isFlipped ? -1 : 1)), 0.05);
+                ballGroup.rotation.y = THREE.MathUtils.lerp(ballGroup.rotation.y, (isFlipped ? Math.PI : 0) + (mouse.x * 0.15 * flipMod), 0.05);
             }
             orbs.forEach(o => {
                 o.data.a += 0.008;
