@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA | KNOTTED CV</title>
+    <title>LUKA BERNSTEIN | KNOTTED CV</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -22,23 +22,31 @@
         const tileGroup = new THREE.Group();
 
         const loader = new THREE.TextureLoader();
-        // --- YOUR RESUME TEXTURES ---
         const resumeTex = loader.load('resume_front.jpg'); 
         resumeTex.wrapS = resumeTex.wrapT = THREE.RepeatWrapping;
-        resumeTex.repeat.set(4, 1); // Repeats the resume along the length of the knot
+        resumeTex.repeat.set(4, 1); 
 
         function createTextTexture(text) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            canvas.width = 2048; canvas.height = 1024;
+            // High resolution wide aspect ratio
+            canvas.width = 4096; canvas.height = 1024;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.font = '500 550px "Times New Roman"';
+            
+            ctx.font = '500 320px "Times New Roman"';
             ctx.fillStyle = '#ffefba';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 45;
+            
+            // Glow effect
+            ctx.shadowColor = '#ffd700';
+            ctx.shadowBlur = 40;
+            
             ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-            return new THREE.CanvasTexture(canvas);
+            
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.anisotropy = 16; // Keeps edges sharp
+            return tex;
         }
 
         function addStars(count, size, depth, opacity = 0.7) {
@@ -65,14 +73,19 @@
             starLayers.push(addStars(4000, 0.15, -80)); 
             starLayers.push(addStars(1500, 0.3, -40));  
 
+            // INCREASED WIDTH FROM 36 TO 46
             namePlane = new THREE.Mesh(
-                new THREE.PlaneGeometry(24, 12),
-                new THREE.MeshStandardMaterial({ map: createTextTexture('LUKA'), transparent: true, emissive: 0xffd700, emissiveIntensity: 1.8 })
+                new THREE.PlaneGeometry(46, 12),
+                new THREE.MeshStandardMaterial({ 
+                    map: createTextTexture('LUKA BERNSTEIN'), 
+                    transparent: true, 
+                    emissive: 0xffd700, 
+                    emissiveIntensity: 1.5 
+                })
             );
             namePlane.position.z = -8;
             scene.add(namePlane);
 
-            // --- TEXTURED TORUS KNOT ---
             const knotGeo = new THREE.TorusKnotGeometry(3.5, 1.2, 300, 100);
             const knotMat = new THREE.MeshStandardMaterial({ 
                 map: resumeTex,
@@ -171,7 +184,6 @@
             if (artifact.visible) {
                 artifact.rotation.y += 0.005;
                 artifact.rotation.z += 0.003;
-                // Subtle mouse tilt for the artifact
                 artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 0.4, 0.05);
                 artifact.rotation.y += mouse.x * 0.02;
             }
