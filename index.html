@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA | PRECISION MAPPING</title>
+    <title>LUKA | SMOOTH FLIP ALIGNMENT</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -16,7 +16,9 @@
     <script>
         let scene, camera, renderer, tiles = [], starLayers = [], orbs = [], namePlane;
         let ballGroup, fragments = [];
-        let isWarping = false, isResumed = false, isFlipped = false;
+        
+        // Added isAnimatingFlip to stop the mouse from fighting the GSAP animation
+        let isWarping = false, isResumed = false, isFlipped = false, isAnimatingFlip = false;
         const mouse = new THREE.Vector2(-10, -10); 
         const raycaster = new THREE.Raycaster();
         const tileGroup = new THREE.Group();
@@ -25,10 +27,14 @@
         const resumeTex = loader.load('resume_front.jpg'); 
         const backTex = loader.load('resume_back.jpg');
 
-        // --- ASPECT & DIMENSIONS ---
+        // --- EXPLICIT PERFECT ASPECT RATIO ---
         const rows = 12, cols = 10; 
-        const ASPECT_RATIO = 1.2941; // 1650 / 1275
-        const baseSize = 1.2;
+        const fragCount = rows * cols;
+        const IMAGE_ASPECT = 1650 / 1275; 
+        const GRID_RATIO = cols / rows; 
+        const ASPECT_MULTIPLIER = IMAGE_ASPECT * GRID_RATIO; 
+        const baseW = 1.2;
+        const baseH = baseW * ASPECT_MULTIPLIER; 
 
         function createTextTexture(text) {
             const canvas = document.createElement('canvas');
@@ -78,51 +84,49 @@
 
             ballGroup = new THREE.Group();
 
-            for (let i = 0; i < rows * cols; i++) {
+            for (let i = 0; i < fragCount; i++) {
                 const fragContainer = new THREE.Group();
                 const uIdx = i % cols;
                 const vIdx = Math.floor(i / cols);
 
-                // --- FRONT PLANE ---
-                const geoF = new THREE.PlaneGeometry(baseSize, baseSize * ASPECT_RATIO);
-                const uvF = geoF.attributes.uv;
-                for (let j = 0; j < uvF.count; j++) {
-                    // Standard mapping: (LocalUV + Index) / Total
-                    let u = (uvF.getX(j) + uIdx) / cols;
-                    let v = (uvF.getY(j) + vIdx) / rows;
-                    uvF.setXY(j, u, v);
-                }
-                const meshFront = new THREE.Mesh(geoF, new THREE.MeshStandardMaterial({ map: resumeTex, roughness: 0.3, metalness: 0.2 }));
+                // --- FRONT SIDE EXPLICIT CORNERS ---
+                const geoFront = new THREE.PlaneGeometry(baseW, baseH);
+                const uvF = geoFront.attributes.uv;
+                uvF.setXY(0, uIdx / cols,       (vIdx + 1) / rows);
+                uvF.setXY(1, (uIdx + 1) / cols, (vIdx + 1) / rows);
+                uvF.setXY(2, uIdx / cols,       vIdx / rows);
+                uvF.setXY(3, (uIdx + 1) / cols, vIdx / rows);
+                const meshFront = new THREE.Mesh(geoFront, new THREE.MeshStandardMaterial({ map: resumeTex, roughness: 0.3, metalness: 0.2 }));
 
-                // --- BACK PLANE (MIRRORED FIX) ---
-                const geoB = new THREE.PlaneGeometry(baseSize, baseSize * ASPECT_RATIO);
-                const uvB = geoB.attributes.uv;
-                for (let j = 0; j < uvB.count; j++) {
-                    // When the mesh is rotated 180 degrees, the texture needs to be sampled in reverse
-                    // to keep the image continuous across tiles.
-                    let uBack = ( (1 - uvB.getX(j)) + (cols - 1 - uIdx) ) / cols;
-                    let vBack = (uvB.getY(j) + vIdx) / rows;
-                    uvB.setXY(j, uBack, vBack);
-                }
-                const meshBack = new THREE.Mesh(geoB, new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.3, metalness: 0.2 }));
-                meshBack.rotation.y = Math.PI;
-                meshBack.position.z = -0.015;
+                // --- BACK SIDE EXPLICIT CORNERS ---
+                const geoBack = new THREE.PlaneGeometry(baseW, baseH);
+                const uvB = geoBack.attributes.uv;
+                const targetCol = cols - 1 - uIdx; 
+                uvB.setXY(0, (targetCol + 1) / cols, (vIdx + 1) / rows); 
+                uvB.setXY(1, targetCol / cols,       (vIdx + 1) / rows); 
+                uvB.setXY(2, (targetCol + 1) / cols, vIdx / rows);       
+                uvB.setXY(3, targetCol / cols,       vIdx / rows);       
+
+                const meshBack = new THREE.Mesh(geoBack, new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.3, metalness: 0.2 }));
+                meshBack.rotation.y = Math.PI; 
+                meshBack.position.z = -0.01;
 
                 fragContainer.add(meshFront);
                 fragContainer.add(meshBack);
 
-                const phi = Math.acos(-1 + (2 * i) / (rows * cols));
-                const theta = Math.sqrt((rows * cols) * Math.PI) * phi;
+                const phi = Math.acos(-1 + (2 * i) / fragCount);
+                const theta = Math.sqrt(fragCount * Math.PI) * phi;
                 fragContainer.position.setFromSphericalCoords(4, phi, theta);
                 fragContainer.lookAt(0, 0, 0);
                 
                 fragContainer.userData = { 
-                    homeX: (uIdx - cols/2 + 0.5) * (baseSize * 0.995), 
-                    homeY: (vIdx - rows/2 + 0.5) * (baseSize * ASPECT_RATIO * 0.995) 
+                    homeX: (uIdx - cols/2 + 0.5) * (baseW * 0.995), 
+                    homeY: (vIdx - rows/2 + 0.5) * (baseH * 0.995) 
                 };
                 fragments.push(fragContainer);
                 ballGroup.add(fragContainer);
             }
+            
             ballGroup.position.z = -150;
             ballGroup.visible = false;
             scene.add(ballGroup);
@@ -146,7 +150,6 @@
             animate();
         }
 
-        // --- DO NOT ALTER: ORIGINAL TILE LOGIC ---
         function generateGrid() {
             while(tileGroup.children.length > 0) tileGroup.remove(tileGroup.children[0]);
             tiles = [];
@@ -195,6 +198,7 @@
                 gsap.to(t.material, { opacity: 0, duration: 1, delay: d + 0.5 });
             });
             starLayers.forEach(l => gsap.to(l.position, { z: 200, duration: 3, ease: "power4.in" }));
+
             setTimeout(() => {
                 ballGroup.visible = true;
                 gsap.to(ballGroup.position, { z: -15, duration: 2.5, ease: "power2.out" });
@@ -203,18 +207,43 @@
 
         function unfoldBall() {
             isResumed = true;
+            isAnimatingFlip = true; // Lock mouse control during unfold
+            
             gsap.to(ballGroup.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
-            gsap.to(ballGroup.position, { x: 0, y: 0, z: -8, duration: 2, ease: "expo.inOut" });
+            gsap.to(ballGroup.position, { 
+                x: 0, y: 0, z: -8, 
+                duration: 2, 
+                ease: "expo.inOut",
+                onComplete: () => isAnimatingFlip = false // Unlock when done
+            });
+
             fragments.forEach((f, i) => {
-                gsap.to(f.position, { x: f.userData.homeX, y: f.userData.homeY, z: 0, duration: 2, delay: i * 0.002, ease: "expo.inOut" });
+                gsap.to(f.position, { 
+                    x: f.userData.homeX, 
+                    y: f.userData.homeY, 
+                    z: 0, 
+                    duration: 2, 
+                    delay: i * 0.002, 
+                    ease: "expo.inOut" 
+                });
                 gsap.to(f.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
+                gsap.to(f.scale, { x: 1.01, y: 1.01, duration: 2, ease: "expo.inOut" });
             });
         }
 
         function flipResume() {
+            if (isAnimatingFlip) return; // Prevent spam-clicking breaking the animation
+            isAnimatingFlip = true;
             isFlipped = !isFlipped;
             const targetY = isFlipped ? Math.PI : 0;
-            gsap.to(ballGroup.rotation, { y: targetY, duration: 1.2, ease: "back.inOut(1.2)" });
+            
+            gsap.to(ballGroup.rotation, { 
+                x: 0, // Flatten the paper out during the flip
+                y: targetY, 
+                duration: 1.2, 
+                ease: "back.inOut(1.2)",
+                onComplete: () => isAnimatingFlip = false // Hand control back to mouse
+            });
         }
 
         function animate() {
@@ -237,22 +266,27 @@
                     }
                 });
             }
+
             if (ballGroup.visible && !isResumed) {
                 ballGroup.rotation.y += 0.01;
                 ballGroup.rotation.x += 0.005;
             }
-            if (isResumed) {
+
+            // Only apply mouse sway if NOT actively flipping
+            if (isResumed && !isAnimatingFlip) {
                 const flipMod = isFlipped ? -1 : 1;
                 const targetRotX = -mouse.y * 0.15;
                 const targetRotY = (isFlipped ? Math.PI : 0) + (mouse.x * 0.15 * flipMod);
                 ballGroup.rotation.x = THREE.MathUtils.lerp(ballGroup.rotation.x, targetRotX, 0.05);
                 ballGroup.rotation.y = THREE.MathUtils.lerp(ballGroup.rotation.y, targetRotY, 0.05);
             }
+
             orbs.forEach(o => {
                 o.data.a += 0.008;
                 o.position.x = Math.cos(o.data.a) * o.data.r;
                 o.position.y = Math.sin(o.data.a * 0.6) * 5;
             });
+
             renderer.render(scene, camera);
         }
         init();
