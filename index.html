@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA | FINAL ALIGNMENT</title>
+    <title>LUKA | SOLID CARD FIX</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -12,7 +12,6 @@
     </style>
 </head>
 <body>
-
     <script>
         let scene, camera, renderer, tiles = [], starLayers = [], orbs = [], namePlane;
         let ballGroup, fragments = [];
@@ -23,39 +22,33 @@
         const tileGroup = new THREE.Group();
 
         const loader = new THREE.TextureLoader();
-        const resumeTex = loader.load('resume_front.jpg'); 
-        const backTex = loader.load('resume_back.jpg');
+        // Force refresh for GitHub cache
+        const resumeTex = loader.load('resume_front.jpg?v=2'); 
+        const backTex = loader.load('resume_back.jpg?v=2');
 
-        // --- MATH FOR 1275 x 1650 RATIO ---
         const rows = 12, cols = 10; 
-        const fragCount = rows * cols;
         const IMAGE_ASPECT = 1650 / 1275; 
-        const GRID_RATIO = cols / rows; 
-        const ASPECT_MULTIPLIER = IMAGE_ASPECT * GRID_RATIO; 
         const baseW = 1.2;
-        const baseH = baseW * ASPECT_MULTIPLIER; 
+        const baseH = baseW * IMAGE_ASPECT; 
 
         function createTextTexture(text) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.width = 2048; canvas.height = 1024;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.font = '500 550px "Times New Roman", Times, serif';
+            ctx.font = '500 550px "Times New Roman"';
             ctx.fillStyle = '#ffefba';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 45;
             ctx.fillText(text, canvas.width / 2, canvas.height / 2);
             return new THREE.CanvasTexture(canvas);
         }
 
-        function addStars(count, size, depth, opacity = 0.7) {
+        function addStars(count, size, depth) {
             const starGeo = new THREE.BufferGeometry();
             const starPos = new Float32Array(count * 3);
             for(let i=0; i<count*3; i++) starPos[i] = (Math.random() - 0.5) * 600;
             starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-            const starMat = new THREE.PointsMaterial({ size, color: 0xffffff, transparent: true, opacity });
-            const points = new THREE.Points(starGeo, starMat);
+            const points = new THREE.Points(starGeo, new THREE.PointsMaterial({ size, color: 0xffffff, transparent: true, opacity: 0.7 }));
             points.position.z = depth;
             scene.add(points);
             return points;
@@ -83,56 +76,66 @@
 
             ballGroup = new THREE.Group();
 
-            for (let i = 0; i < fragCount; i++) {
-                const fragContainer = new THREE.Group();
+            for (let i = 0; i < rows * cols; i++) {
                 const uIdx = i % cols;
                 const vIdx = Math.floor(i / cols);
 
-                // --- FRONT SIDE: Explicit UV Mapping ---
-                const geoF = new THREE.PlaneGeometry(baseW, baseH);
-                const uvF = geoF.attributes.uv;
-                // Correct vertical mapping (Top down)
-                const vStart = (rows - 1 - vIdx) / rows;
-                const vEnd = (rows - vIdx) / rows;
-
-                uvF.setXY(0, uIdx / cols, vEnd);
-                uvF.setXY(1, (uIdx + 1) / cols, vEnd);
-                uvF.setXY(2, uIdx / cols, vStart);
-                uvF.setXY(3, (uIdx + 1) / cols, vStart);
+                // --- CREATING A BOX WITH THICKNESS (0.04) ---
+                const geo = new THREE.BoxGeometry(baseW / cols, baseH / rows, 0.04);
                 
-                const meshFront = new THREE.Mesh(geoF, new THREE.MeshStandardMaterial({ map: resumeTex }));
+                // Front and Back Materials
+                const mats = [
+                    new THREE.MeshStandardMaterial({ color: 0x333333 }), // side
+                    new THREE.MeshStandardMaterial({ color: 0x333333 }), // side
+                    new THREE.MeshStandardMaterial({ color: 0x333333 }), // side
+                    new THREE.MeshStandardMaterial({ color: 0x333333 }), // side
+                    new THREE.MeshStandardMaterial({ map: resumeTex }),  // front
+                    new THREE.MeshStandardMaterial({ map: backTex })    // back
+                ];
 
-                // --- BACK SIDE: Mirrored & Inverted UV Mapping ---
-                const geoB = new THREE.PlaneGeometry(baseW, baseH);
-                const uvB = geoB.attributes.uv;
-                // Horizontal Mirror for Backface
-                const uStartBack = (cols - 1 - uIdx) / cols;
-                const uEndBack = (cols - uIdx) / cols;
+                const frag = new THREE.Mesh(geo, mats);
 
-                uvB.setXY(0, uEndBack, vEnd);
-                uvB.setXY(1, uStartBack, vEnd);
-                uvB.setXY(2, uEndBack, vStart);
-                uvB.setXY(3, uStartBack, vStart);
-
-                const meshBack = new THREE.Mesh(geoB, new THREE.MeshStandardMaterial({ map: backTex }));
-                meshBack.rotation.y = Math.PI; 
-                meshBack.position.z = -0.01;
-
-                fragContainer.add(meshFront);
-                fragContainer.add(meshBack);
-
-                // Sphere placement
-                const phi = Math.acos(-1 + (2 * i) / fragCount);
-                const theta = Math.sqrt(fragCount * Math.PI) * phi;
-                fragContainer.position.setFromSphericalCoords(4, phi, theta);
-                fragContainer.lookAt(0, 0, 0);
+                // UV MAPPING FOR BOX FACES
+                const uvAttr = geo.attributes.uv;
                 
-                fragContainer.userData = { 
-                    homeX: (uIdx - cols/2 + 0.5) * (baseW * 0.995), 
-                    homeY: ((rows - 1 - vIdx) - rows/2 + 0.5) * (baseH * 0.995) 
+                // Front Face (Index 4 in BoxGeometry)
+                const fU0 = uIdx / cols;
+                const fU1 = (uIdx + 1) / cols;
+                const fV0 = (rows - 1 - vIdx) / rows;
+                const fV1 = (rows - vIdx) / rows;
+
+                // Set UVs for the Front Face (8 vertices for that face usually)
+                // We target the specific range for the Front and Back faces
+                const updateFaceUVs = (faceIdx, u0, u1, v0, v1) => {
+                    const offset = faceIdx * 4;
+                    uvAttr.setXY(offset, u0, v1);
+                    uvAttr.setXY(offset + 1, u1, v1);
+                    uvAttr.setXY(offset + 2, u0, v0);
+                    uvAttr.setXY(offset + 3, u1, v0);
                 };
-                fragments.push(fragContainer);
-                ballGroup.add(fragContainer);
+
+                // Front (Face 4)
+                updateFaceUVs(4, fU0, fU1, fV0, fV1);
+                
+                // Back (Face 5) - Mirroring the Horizontal
+                const bU0 = (cols - uIdx) / cols;
+                const bU1 = (cols - 1 - uIdx) / cols;
+                updateFaceUVs(5, bU0, bU1, fV0, fV1);
+
+                const phi = Math.acos(-1 + (2 * i) / (rows * cols));
+                const theta = Math.sqrt((rows * cols) * Math.PI) * phi;
+                frag.position.setFromSphericalCoords(4, phi, theta);
+                frag.lookAt(0, 0, 0);
+                
+                frag.userData = { 
+                    homeX: (uIdx - cols/2 + 0.5) * (baseW/cols * cols * 0.1), // Placeholder for calc
+                    homeY: ((rows - 1 - vIdx) - rows/2 + 0.5) * (baseH/rows * rows * 0.1),
+                    gridX: (uIdx - cols/2 + 0.5) * (baseW/cols * 1.01),
+                    gridY: ((rows - 1 - vIdx) - rows/2 + 0.5) * (baseH/rows * 1.01)
+                };
+                
+                fragments.push(frag);
+                ballGroup.add(frag);
             }
             
             ballGroup.position.z = -150;
@@ -150,7 +153,7 @@
 
             generateGrid();
             scene.add(tileGroup);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('click', onClick);
@@ -158,7 +161,6 @@
             animate();
         }
 
-        // --- ORIGINAL TILE LOGIC ---
         function generateGrid() {
             while(tileGroup.children.length > 0) tileGroup.remove(tileGroup.children[0]);
             tiles = [];
@@ -170,7 +172,7 @@
             const rg = Math.ceil(h / spacing) + 8;
             for (let x = -cg/2; x < cg/2; x++) {
                 for (let y = -rg/2; y < rg/2; y++) {
-                    const tile = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, metalness: 0.9 }));
+                    const tile = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 }));
                     tile.position.set(x * spacing, y * spacing, 0);
                     tileGroup.add(tile); tiles.push(tile);
                 }
@@ -187,13 +189,9 @@
             if (!isWarping) {
                 if (raycaster.intersectObject(namePlane).length > 0) startWarp();
             } else if (!isResumed) {
-                const targets = [];
-                fragments.forEach(f => targets.push(...f.children));
-                if (raycaster.intersectObjects(targets).length > 0) unfoldBall();
+                if (raycaster.intersectObjects(fragments).length > 0) unfoldBall();
             } else {
-                const targets = [];
-                fragments.forEach(f => targets.push(...f.children));
-                if (raycaster.intersectObjects(targets).length > 0) flipResume();
+                if (raycaster.intersectObjects(fragments).length > 0) flipResume();
             }
         }
 
@@ -219,7 +217,7 @@
             gsap.to(ballGroup.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
             gsap.to(ballGroup.position, { x: 0, y: 0, z: -8, duration: 2, ease: "expo.inOut", onComplete: () => isAnimatingFlip = false });
             fragments.forEach((f, i) => {
-                gsap.to(f.position, { x: f.userData.homeX, y: f.userData.homeY, z: 0, duration: 2, delay: i * 0.002, ease: "expo.inOut" });
+                gsap.to(f.position, { x: f.userData.gridX, y: f.userData.gridY, z: 0, duration: 2, delay: i * 0.002, ease: "expo.inOut" });
                 gsap.to(f.rotation, { x: 0, y: 0, z: 0, duration: 2, ease: "expo.inOut" });
             });
         }
@@ -228,28 +226,16 @@
             if (isAnimatingFlip) return;
             isAnimatingFlip = true;
             isFlipped = !isFlipped;
-            const targetY = isFlipped ? Math.PI : 0;
-            gsap.to(ballGroup.rotation, { x: 0, y: targetY, duration: 1.2, ease: "back.inOut(1.2)", onComplete: () => isAnimatingFlip = false });
+            gsap.to(ballGroup.rotation, { x: 0, y: isFlipped ? Math.PI : 0, duration: 1.2, ease: "back.inOut(1.2)", onComplete: () => isAnimatingFlip = false });
         }
 
         function animate() {
             requestAnimationFrame(animate);
             if (!isWarping) {
-                starLayers.forEach((l, i) => {
-                    l.position.x = THREE.MathUtils.lerp(l.position.x, mouse.x * (i + 1) * 1.5, 0.05);
-                    l.position.y = THREE.MathUtils.lerp(l.position.y, mouse.y * (i + 1) * 1.5, 0.05);
-                });
                 const tx = mouse.x * 10, ty = mouse.y * 6;
                 tiles.forEach(tile => {
                     const dist = Math.sqrt((tile.position.x - tx)**2 + (tile.position.y - ty)**2);
-                    if (dist < 4) {
-                        const f = (4 - dist) / 4;
-                        tile.position.z = THREE.MathUtils.lerp(tile.position.z, f * 3, 0.1);
-                        tile.material.opacity = 0.35 + (f * 0.3);
-                    } else {
-                        tile.position.z = THREE.MathUtils.lerp(tile.position.z, 0, 0.08);
-                        tile.material.opacity = 0.35;
-                    }
+                    tile.position.z = THREE.MathUtils.lerp(tile.position.z, dist < 4 ? (4 - dist) / 4 * 3 : 0, 0.1);
                 });
             }
             if (ballGroup.visible && !isResumed) {
@@ -257,9 +243,8 @@
                 ballGroup.rotation.x += 0.005;
             }
             if (isResumed && !isAnimatingFlip) {
-                const flipMod = isFlipped ? -1 : 1;
                 ballGroup.rotation.x = THREE.MathUtils.lerp(ballGroup.rotation.x, -mouse.y * 0.15, 0.05);
-                ballGroup.rotation.y = THREE.MathUtils.lerp(ballGroup.rotation.y, (isFlipped ? Math.PI : 0) + (mouse.x * 0.15 * flipMod), 0.05);
+                ballGroup.rotation.y = THREE.MathUtils.lerp(ballGroup.rotation.y, (isFlipped ? Math.PI : 0) + (mouse.x * 0.15 * (isFlipped ? -1 : 1)), 0.05);
             }
             orbs.forEach(o => {
                 o.data.a += 0.008;
