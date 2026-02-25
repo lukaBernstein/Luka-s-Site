@@ -21,7 +21,6 @@
         const raycaster = new THREE.Raycaster();
         const tileGroup = new THREE.Group();
 
-        // 1. Data Generation for Nebula Resume Text
         function getResumeCoords() {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -48,7 +47,6 @@
             return points;
         }
 
-        // 2. Visual Component Creators
         function createNameTexture(text) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -137,7 +135,6 @@
             renderer.toneMapping = THREE.ReinhardToneMapping; 
             document.body.appendChild(renderer.domElement);
 
-            // Stars Background
             const starGeo = new THREE.SphereGeometry(0.12, 8, 8);
             for(let i=0; i<3000; i++) {
                 const star = new THREE.Mesh(starGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
@@ -146,13 +143,11 @@
                 starObjects.push(star); mainGroup.add(star);
             }
 
-            // Landing UI Elements
             namePlane = new THREE.Mesh(new THREE.PlaneGeometry(35, 10), new THREE.MeshBasicMaterial({ map: createNameTexture('LUKA BERNSTEIN'), transparent: true, color: 0xffd700 }));
             namePlane.position.z = -8; scene.add(namePlane);
             glowPlane = createAuraMesh(); scene.add(glowPlane);
             nameLight = new THREE.PointLight(0xffd700, 250, 55); nameLight.position.set(0, 0, -4.5); scene.add(nameLight);
 
-            // Artifact & Nebula
             artifact = createObsidianPolyhedron();
             nebula = createNebula(); artifact.add(nebula);
             artifact.position.z = -1000; artifact.visible = false; mainGroup.add(artifact);
@@ -161,17 +156,18 @@
             buttonBox = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0 }));
             buttonBox.position.set(0, 0.2, 0.5); nebula.add(buttonBox);
 
-            // Orbs (including the Orthogonal 4th orb)
             const configs = [
-                {c:0xff007b, r:10, type:'h'}, 
-                {c:0x7000ff, r:12, type:'h'}, 
-                {c:0xffd700, r:11, type:'h'},
-                {c:0x00ffff, r:10.5, type:'v'} // The Orthogonal Orb
+                {c:0xff007b, r:14, type:'h', speed: 0.008}, 
+                {c:0x7000ff, r:18, type:'h', speed: 0.006}, 
+                {c:0xffd700, r:16, type:'h', speed: 0.007},
+                {c:0x00ffff, r:15, type:'v', speed: 0.009}
             ];
             configs.forEach((cfg, i) => {
                 const orb = new THREE.Group();
-                orb.add(new THREE.PointLight(cfg.c, 150, 40)); orb.add(new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), new THREE.MeshBasicMaterial({ color: cfg.c })));
-                orb.data = { a: i * 2, r: cfg.r, type: cfg.type }; orbs.push(orb); mainGroup.add(orb);
+                orb.add(new THREE.PointLight(cfg.c, 300, 60)); 
+                orb.add(new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), new THREE.MeshBasicMaterial({ color: cfg.c })));
+                orb.data = { a: i * 2, r: cfg.r, type: cfg.type, speed: cfg.speed }; 
+                orbs.push(orb); mainGroup.add(orb);
             });
 
             generateGrid(); scene.add(tileGroup);
@@ -308,17 +304,24 @@
             }
 
             orbs.forEach(o => {
-                o.data.a += 0.01;
+                o.data.a += o.data.speed;
                 let t = isWarping ? warpProgress : 0;
-                let currentR = THREE.MathUtils.lerp(o.data.r, o.data.r + 10, Math.pow(t, 1.5));
+                
+                // Radius expands slightly during warp
+                let currentR = THREE.MathUtils.lerp(o.data.r, o.data.r + 5, t);
+                
                 if(o.data.type === 'v') {
+                    // VERTICAL ORBIT: Loops Y and Z axes
+                    // This swings between Z = -25 (behind) and Z = 5 (in front of glass)
+                    o.position.x = Math.sin(o.data.a * 0.3) * 3; // Slight drift
                     o.position.y = Math.cos(o.data.a) * currentR;
-                    o.position.z = Math.sin(o.data.a) * currentR + THREE.MathUtils.lerp(0, -15, t);
-                    o.position.x = Math.sin(o.data.a * 0.5) * 2;
+                    o.position.z = THREE.MathUtils.lerp(-8, -15, t) + (Math.sin(o.data.a) * (currentR * 1.2));
                 } else {
+                    // HORIZONTAL ORBIT: Loops X and Z axes
+                    // This circles the nameplate, passing behind and then in front
                     o.position.x = Math.cos(o.data.a) * currentR;
-                    o.position.y = Math.sin(o.data.a * 0.6) * THREE.MathUtils.lerp(4, 8, t);
-                    o.position.z = THREE.MathUtils.lerp(0, -15, t);
+                    o.position.y = Math.sin(o.data.a * 0.5) * 4; // Slight vertical wave
+                    o.position.z = THREE.MathUtils.lerp(-8, -15, t) + (Math.sin(o.data.a) * (currentR * 1.1));
                 }
             });
         }
