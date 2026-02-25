@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA BERNSTEIN | OBSIDIAN UNLOCK</title>
+    <title>LUKA BERNSTEIN | GLASS ARTIFACT</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
@@ -22,7 +22,6 @@
         const raycaster = new THREE.Raycaster();
         const tileGroup = new THREE.Group();
 
-        // --- 1. TEXTURE GENERATOR ---
         function createNameTexture(text) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -38,7 +37,6 @@
             return new THREE.CanvasTexture(canvas);
         }
 
-        // --- 2. AURA GENERATOR (The "Egg") ---
         function createAuraMesh() {
             const canvas = document.createElement('canvas');
             canvas.width = 512; canvas.height = 512;
@@ -48,36 +46,30 @@
             grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, 512, 512);
-            
             const tex = new THREE.CanvasTexture(canvas);
-            const mat = new THREE.MeshBasicMaterial({ 
-                map: tex, 
-                transparent: true, 
-                blending: THREE.AdditiveBlending, 
-                opacity: 0.3 
-            });
+            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, opacity: 0.3 });
             const mesh = new THREE.Mesh(new THREE.PlaneGeometry(54, 25), mat);
             mesh.position.z = -8.2; 
             return mesh;
         }
 
         function createNebula() {
-            const count = 2000;
+            const count = 2500;
             const geo = new THREE.BufferGeometry();
             const pos = new Float32Array(count * 3);
             const colors = new Float32Array(count * 3);
             for(let i = 0; i < count * 3; i+=3) {
-                const r = Math.random() * 3.8;
+                const r = Math.random() * 4.5;
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.acos(2 * Math.random() - 1);
                 pos[i] = r * Math.sin(phi) * Math.cos(theta);
                 pos[i+1] = r * Math.sin(phi) * Math.sin(theta);
                 pos[i+2] = r * Math.cos(phi);
-                colors[i] = 1.0; colors[i+1] = 0.2 + Math.random() * 0.4; colors[i+2] = 0.8;
+                colors[i] = 1.0; colors[i+1] = 0.3 + Math.random() * 0.4; colors[i+2] = 0.9;
             }
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-            const mat = new THREE.PointsMaterial({ size: 0.07, vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending });
+            const mat = new THREE.PointsMaterial({ size: 0.08, vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending });
             return new THREE.Points(geo, mat);
         }
 
@@ -85,8 +77,20 @@
             const group = new THREE.Group();
             const baseGeo = new THREE.DodecahedronGeometry(4, 0);
             const posAttr = baseGeo.attributes.position;
-            const faceMat = new THREE.MeshStandardMaterial({ color: 0x050505, metalness: 0.9, roughness: 0.1, side: THREE.DoubleSide });
-            const edgeMat = new THREE.LineBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.8 });
+            
+            // --- TINTED GLASS MATERIAL ---
+            const faceMat = new THREE.MeshPhysicalMaterial({ 
+                color: 0x111111,        // Dark tint
+                metalness: 0.1, 
+                roughness: 0.05, 
+                transmission: 0.95,     // Makes it glass-like
+                thickness: 2.0,         // Refraction depth
+                transparent: true, 
+                opacity: 0.6,           // Slight surface visibility
+                side: THREE.DoubleSide 
+            });
+
+            const edgeMat = new THREE.LineBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.5 });
 
             for (let i = 0; i < posAttr.count; i += 3) {
                 const geometry = new THREE.BufferGeometry();
@@ -125,6 +129,8 @@
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            // Physical lighting needs this for glass to look right
+            renderer.toneMapping = THREE.ReinhardToneMapping;
             document.body.appendChild(renderer.domElement);
 
             const starGeo = new THREE.SphereGeometry(0.12, 8, 8);
@@ -137,14 +143,7 @@
                 mainGroup.add(star);
             }
 
-            namePlane = new THREE.Mesh(
-                new THREE.PlaneGeometry(35, 10),
-                new THREE.MeshBasicMaterial({ 
-                    map: createNameTexture('LUKA BERNSTEIN'), 
-                    transparent: true,
-                    color: 0xffd700 
-                })
-            );
+            namePlane = new THREE.Mesh(new THREE.PlaneGeometry(35, 10), new THREE.MeshBasicMaterial({ map: createNameTexture('LUKA BERNSTEIN'), transparent: true, color: 0xffd700 }));
             namePlane.position.z = -8;
             scene.add(namePlane);
 
@@ -174,7 +173,7 @@
 
             generateGrid();
             scene.add(tileGroup);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.18)); 
+            scene.add(new THREE.AmbientLight(0xffffff, 0.25)); // Slightly higher ambient for glass reflections
 
             window.addEventListener('mousemove', (e) => {
                 mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -207,9 +206,7 @@
         function onClick() {
             raycaster.setFromCamera(mouse, camera);
 
-            // Handle Unfolding if arrived
             if (arrived) {
-                // TRUE enables recursive checking through the group
                 const intersects = raycaster.intersectObjects(artifact.children, true);
                 if (intersects.length > 0 && !isUnfolded) {
                     isUnfolded = true;
@@ -225,7 +222,6 @@
                 }
             }
 
-            // Handle Initial Warp
             if (!isWarping && raycaster.intersectObject(namePlane).length > 0) {
                 isWarping = true;
                 gsap.to([namePlane.scale, glowPlane.scale], { x: 3, y: 0.1, duration: 0.8, ease: "power4.in" });
@@ -237,11 +233,7 @@
                     gsap.to(t.position, { z: 50, x: t.position.x * 5, y: t.position.y * 5, duration: 1.5, delay: d, ease: "power2.in" });
                     gsap.to(t.material, { opacity: 0, duration: 1, delay: d + 0.5 });
                 });
-                gsap.to(window, { 
-                    duration: 4.0, 
-                    onUpdate: function() { warpProgress = this.progress(); },
-                    onComplete: () => { arrived = true; }
-                });
+                gsap.to(window, { duration: 4.0, onUpdate: function() { warpProgress = this.progress(); }, onComplete: () => { arrived = true; }});
                 starObjects.forEach(s => {
                     gsap.to(s.scale, { z: 150, duration: 1.0 });
                     gsap.to(s.scale, { z: 1, duration: 0.5, delay: 3.2 });
@@ -257,11 +249,9 @@
             requestAnimationFrame(animate);
             renderer.render(scene, camera);
             
-            // BREATHING EFFECT LOGIC
             if (namePlane && !isWarping) {
                 const time = Date.now() * 0.0022; 
                 const breath = (Math.sin(time) + 1) / 2; 
-                
                 namePlane.material.color.setRGB(1.0, 0.8 + (0.15 * breath), 0.35 + (0.5 * breath));
                 glowPlane.material.opacity = 0.1 + (0.5 * breath); 
                 const s = 1.0 + (breath * 0.1); 
