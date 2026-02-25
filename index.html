@@ -14,7 +14,7 @@
 <body>
     <script>
         let scene, camera, renderer, clock, tiles = [], starObjects = [], orbs = [], namePlane, glowPlane, nameLight, sweepLight;
-        let artifact, nebula, buttonBox, isWarping = false, arrived = false, isUnfolded = false, isSpelling = false, isCredits = false;
+        let artifact, nebula, buttonBox, isWarping = false, arrived = false, isUnfolded = false, isSpelling = false, isCredits = false, isPanning = false;
         let warpProgress = 0, mainGroup;
         
         const _v3 = new THREE.Vector3();
@@ -143,6 +143,18 @@
             gsap.to(buttonBox.material, { opacity: 0, duration: 1.5 });
         }
 
+        function rollCreditsSequence() {
+            if (isPanning) return;
+            isPanning = true;
+            // Quickly shoot camera away and tilt it into the abyss
+            gsap.to(camera.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
+            gsap.to(camera.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
+            
+            // Simultaneously drop the entire scene content out of view
+            gsap.to(mainGroup.position, { y: -500, z: -500, duration: 3, ease: "power3.in" });
+            gsap.to(tileGroup.position, { y: -500, duration: 3, ease: "power3.in" });
+        }
+
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
@@ -193,7 +205,6 @@
             buttonBox = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({ color: 0xffd966, transparent: true, opacity: 0 }));
             buttonBox.position.set(0, 0.2, 0.5); nebula.add(buttonBox);
 
-            // ORB SETUP FROM FILE
             const configs = [{c:0xff007b, r:14, t:'h', s:0.008}, {c:0x7000ff, r:18, t:'h', s:0.006}, {c:0xffd700, r:16, t:'h', s:0.007}, {c:0x00ffff, r:15, t:'v', s:0.009}];
             configs.forEach((cfg, i) => {
                 const orb = new THREE.Group();
@@ -254,9 +265,13 @@
         function onClick() {
             raycaster.setFromCamera(mouse, camera);
 
-            if (isSpelling && !isCredits) {
+            if (isSpelling) {
                 if (raycaster.intersectObjects([nebula, buttonBox], true).length > 0) {
-                    downloadResume();
+                    if (!isCredits) {
+                        downloadResume();
+                    } else {
+                        rollCreditsSequence();
+                    }
                     return;
                 }
             }
@@ -349,7 +364,6 @@
                 camera.updateProjectionMatrix();
             }
 
-            // ORB LOGIC REPLACED EXACTLY FROM FILE
             for(let i=0; i<orbs.length; i++) {
                 const o = orbs[i];
                 o.data.a += o.data.speed;
@@ -379,9 +393,10 @@
                 posAttr.needsUpdate = true; colAttr.needsUpdate = true;
                 nebula.rotation.set(-artifact.rotation.x, -artifact.rotation.y, -artifact.rotation.z);
                 if (!isCredits) buttonBox.material.opacity = 0.4 + Math.sin(timeNow * 2) * 0.2;
+                
                 raycaster.setFromCamera(mouse, camera);
                 const hover = raycaster.intersectObjects([nebula, buttonBox], true);
-                document.body.style.cursor = (hover.length > 0 && !isCredits) ? 'pointer' : 'crosshair';
+                document.body.style.cursor = (hover.length > 0) ? 'pointer' : 'crosshair';
             }
 
             for(let i=0; i<starObjects.length; i++) {
