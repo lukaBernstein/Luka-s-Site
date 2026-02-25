@@ -167,15 +167,21 @@
             const nameMat = new THREE.MeshStandardMaterial({ 
                 map: createNameTexture('LUKA BERNSTEIN'), 
                 transparent: true, color: 0xffd966, emissive: 0xffaa00,
-                emissiveIntensity: 0.45, roughness: 0.1, metalness: 0.8 
+                emissiveIntensity: 0.45, roughness: 0.1, metalness: 0.8,
+                opacity: 0 
             });
             namePlane = new THREE.Mesh(new THREE.PlaneGeometry(35, 10), nameMat);
-            namePlane.position.z = -8; scene.add(namePlane);
-            glowPlane = createAuraMesh(); scene.add(glowPlane);
+            namePlane.position.z = 200; 
+            scene.add(namePlane);
+
+            glowPlane = createAuraMesh();
+            glowPlane.position.z = 200;
+            glowPlane.material.opacity = 0;
+            scene.add(glowPlane);
             
-            nameLight = new THREE.PointLight(0xffcc00, 280, 60); 
+            nameLight = new THREE.PointLight(0xffcc00, 0, 60); 
             nameLight.position.set(0, 0, -4.5); scene.add(nameLight);
-            sweepLight = new THREE.PointLight(0xffffff, 880, 45);
+            sweepLight = new THREE.PointLight(0xffffff, 0, 45);
             sweepLight.position.set(-20, 10, -5); scene.add(sweepLight);
 
             artifact = createObsidianPolyhedron();
@@ -187,6 +193,7 @@
             buttonBox = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({ color: 0xffd966, transparent: true, opacity: 0 }));
             buttonBox.position.set(0, 0.2, 0.5); nebula.add(buttonBox);
 
+            // ORB SETUP FROM FILE
             const configs = [{c:0xff007b, r:14, t:'h', s:0.008}, {c:0x7000ff, r:18, t:'h', s:0.006}, {c:0xffd700, r:16, t:'h', s:0.007}, {c:0x00ffff, r:15, t:'v', s:0.009}];
             configs.forEach((cfg, i) => {
                 const orb = new THREE.Group();
@@ -200,6 +207,21 @@
             scene.add(tileGroup);
             scene.add(new THREE.AmbientLight(0xffffff, 0.45)); 
             renderer.compile(scene, camera);
+
+            gsap.to(namePlane.position, { z: -8, duration: 1.8, ease: "power4.out" });
+            gsap.to(namePlane.material, { opacity: 1, duration: 1.2, delay: 0.2 });
+            gsap.to(glowPlane.position, { z: -8.2, duration: 1.8, ease: "power4.out" });
+            gsap.to(glowPlane.material, { opacity: 0.42, duration: 1.2, delay: 0.4 });
+            gsap.to(nameLight, { intensity: 280, duration: 2, delay: 0.5 });
+            gsap.to(sweepLight, { intensity: 880, duration: 2, delay: 0.6 });
+
+            tiles.forEach(t => {
+                const finalZ = t.position.z;
+                t.position.z = 300 + (Math.random() * 200);
+                t.material.opacity = 0;
+                gsap.to(t.position, { z: finalZ, duration: 2.2 + Math.random(), ease: "power3.out", delay: Math.random() * 0.5 });
+                gsap.to(t.material, { opacity: 0.4, duration: 1.5, delay: 0.8 + Math.random() * 0.5 });
+            });
 
             window.addEventListener('mousemove', (e) => { mouse.x = (e.clientX/window.innerWidth)*2-1; mouse.y = -(e.clientY/window.innerHeight)*2+1; });
             window.addEventListener('click', onClick);
@@ -262,19 +284,19 @@
             }
             if (!isWarping && raycaster.intersectObject(namePlane).length > 0) {
                 isWarping = true;
-                // ATTRATIVE NAME DISAPPEARANCE: Scale into a pinpoint flicker
-                gsap.to([namePlane.scale, glowPlane.scale], { x: 0.01, y: 0.01, duration: 0.9, ease: "back.in(2)" });
-                gsap.to([namePlane.material, glowPlane.material], { opacity: 0, duration: 0.8 });
-                gsap.to([nameLight, sweepLight], { intensity: 0, duration: 0.6 });
+                gsap.to([namePlane.position, glowPlane.position], { z: 100, duration: 2.5, ease: "power2.in" });
+                gsap.to([namePlane.scale, glowPlane.scale], { x: 5, y: 5, duration: 2.5, ease: "power2.in" });
+                gsap.to([namePlane.material, glowPlane.material], { opacity: 0, duration: 1.8, delay: 0.5 });
+                gsap.to([nameLight, sweepLight], { intensity: 0, duration: 1.2 });
                 
-                // ATTRACTIVE TILE DISAPPEARANCE: Shatter and Fly Outward
                 tiles.forEach(t => {
                     const delay = Math.random() * 0.4;
-                    const flyX = (t.position.x * 12) + (Math.random() - 0.5) * 50;
-                    const flyY = (t.position.y * 12) + (Math.random() - 0.5) * 50;
-                    gsap.to(t.position, { x: flyX, y: flyY, z: 80, duration: 1.8, delay: delay, ease: "power2.in" });
-                    gsap.to(t.rotation, { x: Math.random() * 10, y: Math.random() * 10, duration: 1.8, delay: delay });
-                    gsap.to(t.material, { opacity: 0, duration: 1.2, delay: delay + 0.4 });
+                    const flyX = (t.position.x * 20);
+                    const flyY = (t.position.y * 20);
+                    gsap.to(t.position, { x: flyX, y: flyY, z: 100, duration: 2.4, delay: delay, ease: "power2.in" });
+                    gsap.to(t.scale, { x: 3, y: 3, duration: 2.4, delay: delay });
+                    gsap.to(t.rotation, { x: Math.random() * 12, y: Math.random() * 12, duration: 2.4, delay: delay });
+                    gsap.to(t.material, { opacity: 0, duration: 1.2, delay: delay + 1.2 });
                 });
 
                 gsap.to(window, { duration: 4.0, onUpdate: function() { warpProgress = this.progress(); }, onComplete: () => arrived = true });
@@ -284,7 +306,7 @@
                 });
                 setTimeout(() => { 
                     artifact.visible = true; 
-                    gsap.to(artifact.position, { z: -15, duration: 1.2 }); 
+                    gsap.to(artifact.position, { z: -15, duration: 1.5, ease: "power3.out" }); 
                 }, 2800);
             }
         }
@@ -292,6 +314,7 @@
         function animate() {
             requestAnimationFrame(animate);
             const timeNow = clock.getElapsedTime();
+
             if (namePlane && !isWarping) {
                 const pingPong = Math.sin(timeNow * 1.2); 
                 sweepLight.position.x = pingPong * 28; 
@@ -299,22 +322,25 @@
                 const breath = 0.45 + ((Math.sin(timeNow * 2.2) + 1) / 2) * 0.40; 
                 glowPlane.material.opacity = 0.3 + (0.28 * breath); 
                 glowPlane.scale.set(1.08 + (breath * 0.07), 1.08 + (breath * 0.07), 1);
-                nameLight.intensity = 230 + (breath * 165); 
+                nameLight.intensity = (230 + (breath * 165)); 
                 namePlane.material.emissiveIntensity = 0.45 + (breath * 0.38);
                 const tx = mouse.x * 10, ty = mouse.y * 6;
                 for(let i=0; i<tiles.length; i++){
                     const tile = tiles[i];
-                    const d = Math.sqrt((tile.position.x - tx)**2 + (tile.position.y - ty)**2);
-                    if (d < 4) {
-                        const f = (4 - d) / 4;
-                        tile.position.z = THREE.MathUtils.lerp(tile.position.z, f * 3, 0.1);
-                        tile.material.opacity = 0.4 + (f * 0.3);
-                    } else if (tile.position.z !== 0) {
-                        tile.position.z = THREE.MathUtils.lerp(tile.position.z, 0, 0.08);
-                        tile.material.opacity = 0.4;
+                    if(Math.abs(tile.position.z) < 5) {
+                        const d = Math.sqrt((tile.position.x - tx)**2 + (tile.position.y - ty)**2);
+                        if (d < 4) {
+                            const f = (4 - d) / 4;
+                            tile.position.z = THREE.MathUtils.lerp(tile.position.z, f * 3, 0.1);
+                            tile.material.opacity = 0.4 + (f * 0.3);
+                        } else {
+                            tile.position.z = THREE.MathUtils.lerp(tile.position.z, 0, 0.08);
+                            tile.material.opacity = 0.4;
+                        }
                     }
                 }
             }
+
             if(isWarping && !arrived) {
                 camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 60);
                 camera.updateProjectionMatrix();
@@ -322,39 +348,8 @@
                 camera.fov = THREE.MathUtils.lerp(camera.fov, 75, 0.1);
                 camera.updateProjectionMatrix();
             }
-            if (isSpelling) {
-                const posAttr = nebula.geometry.attributes.position;
-                const colAttr = nebula.geometry.attributes.color;
-                const tarAttr = isCredits ? nebula.geometry.attributes.creditsTarget : nebula.geometry.attributes.target;
-                for (let i = 0; i < posAttr.count; i++) {
-                    const i3 = i * 3;
-                    posAttr.array[i3] = THREE.MathUtils.lerp(posAttr.array[i3], tarAttr.array[i3], 0.04);
-                    posAttr.array[i3+1] = THREE.MathUtils.lerp(posAttr.array[i3+1], tarAttr.array[i3+1], 0.04);
-                    posAttr.array[i3+2] = THREE.MathUtils.lerp(posAttr.array[i3+2], tarAttr.array[i3+2], 0.04);
-                    const wave = Math.sin(i * 0.8 + timeNow * 8.0);
-                    const flash = Math.pow(Math.max(0, wave), 8) * 1.5; 
-                    colAttr.array[i3] = 1.0 * (0.02 + flash); 
-                    colAttr.array[i3+1] = 0.85 * (0.02 + flash); 
-                    colAttr.array[i3+2] = 0.2 * (0.02 + flash);
-                }
-                posAttr.needsUpdate = true; colAttr.needsUpdate = true;
-                nebula.rotation.set(-artifact.rotation.x, -artifact.rotation.y, -artifact.rotation.z);
-                if (!isCredits) buttonBox.material.opacity = 0.4 + Math.sin(timeNow * 2) * 0.2;
-                raycaster.setFromCamera(mouse, camera);
-                const hover = raycaster.intersectObjects([nebula, buttonBox], true);
-                document.body.style.cursor = (hover.length > 0 && !isCredits) ? 'pointer' : 'crosshair';
-            }
-            for(let i=0; i<starObjects.length; i++) {
-                const s = starObjects[i];
-                let speed = s.userData.speed + (isWarping && !arrived ? Math.pow(Math.sin(warpProgress * Math.PI), 2) * 60 : 0);
-                s.position.z += speed;
-                if (s.position.z > 20) resetStar(s);
-            }
-            if (artifact.visible) {
-                artifact.rotation.y += 0.002;
-                artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 0.4, 0.05);
-                artifact.rotation.y += mouse.x * 0.01;
-            }
+
+            // ORB LOGIC REPLACED EXACTLY FROM FILE
             for(let i=0; i<orbs.length; i++) {
                 const o = orbs[i];
                 o.data.a += o.data.speed;
@@ -367,6 +362,42 @@
                     o.position.x = Math.cos(o.data.a) * currentR; o.position.y = Math.sin(o.data.a * 0.5) * 4; o.position.z = zPos + (sinA * (currentR * 1.1));
                 }
             }
+
+            if (isSpelling) {
+                const posAttr = nebula.geometry.attributes.position;
+                const colAttr = nebula.geometry.attributes.color;
+                const tarAttr = isCredits ? nebula.geometry.attributes.creditsTarget : nebula.geometry.attributes.target;
+                for (let i = 0; i < posAttr.count; i++) {
+                    const i3 = i * 3;
+                    posAttr.array[i3] = THREE.MathUtils.lerp(posAttr.array[i3], tarAttr.array[i3], 0.04);
+                    posAttr.array[i3+1] = THREE.MathUtils.lerp(posAttr.array[i3+1], tarAttr.array[i3+1], 0.04);
+                    posAttr.array[i3+2] = THREE.MathUtils.lerp(posAttr.array[i3+2], tarAttr.array[i3+2], 0.04);
+                    const wave = Math.sin(i * 0.8 + timeNow * 8.0);
+                    const flash = Math.pow(Math.max(0, wave), 8) * 1.5; 
+                    colAttr.array[i3] = 1.0 * (0.02 + flash); colAttr.array[i3+1] = 0.85 * (0.02 + flash); colAttr.array[i3+2] = 0.2 * (0.02 + flash);
+                }
+                posAttr.needsUpdate = true; colAttr.needsUpdate = true;
+                nebula.rotation.set(-artifact.rotation.x, -artifact.rotation.y, -artifact.rotation.z);
+                if (!isCredits) buttonBox.material.opacity = 0.4 + Math.sin(timeNow * 2) * 0.2;
+                raycaster.setFromCamera(mouse, camera);
+                const hover = raycaster.intersectObjects([nebula, buttonBox], true);
+                document.body.style.cursor = (hover.length > 0 && !isCredits) ? 'pointer' : 'crosshair';
+            }
+
+            for(let i=0; i<starObjects.length; i++) {
+                const s = starObjects[i];
+                let speed = s.userData.speed + (isWarping && !arrived ? Math.pow(Math.sin(warpProgress * Math.PI), 2) * 60 : 0);
+                s.position.z += speed;
+                if (s.position.z > 20 && !isWarping) resetStar(s);
+                else if (s.position.z > 800) resetStar(s);
+            }
+
+            if (artifact.visible) {
+                artifact.rotation.y += 0.002;
+                artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 0.4, 0.05);
+                artifact.rotation.y += mouse.x * 0.01;
+            }
+
             renderer.render(scene, camera);
         }
 
