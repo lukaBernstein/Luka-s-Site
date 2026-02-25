@@ -98,8 +98,22 @@
             const group = new THREE.Group();
             const baseGeo = new THREE.DodecahedronGeometry(4, 0);
             const posAttr = baseGeo.attributes.position;
-            const faceMat = new THREE.MeshPhysicalMaterial({ color: 0x111111, metalness: 0.1, roughness: 0.05, transmission: 0.95, thickness: 2.0, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
-            const edgeMat = new THREE.LineBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.5 });
+            
+            // --- RAINBOW ANODIZED SURFACE ---
+            const faceMat = new THREE.MeshPhysicalMaterial({ 
+                color: 0x222222, 
+                metalness: 1.0, 
+                roughness: 0.15,
+                iridescence: 1.0, 
+                iridescenceIOR: 1.8,
+                iridescenceThicknessRange: [100, 400],
+                transparent: true, 
+                opacity: 0.9, 
+                side: THREE.DoubleSide 
+            });
+
+            const edgeMat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.7 });
+
             for (let i = 0; i < posAttr.count; i += 3) {
                 const geometry = new THREE.BufferGeometry();
                 const v = [posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i), posAttr.getX(i+1), posAttr.getY(i+1), posAttr.getZ(i+1), posAttr.getX(i+2), posAttr.getY(i+2), posAttr.getZ(i+2)];
@@ -152,7 +166,6 @@
             buttonBox = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0 }));
             buttonBox.position.set(0, 0.2, 0.5); nebula.add(buttonBox);
 
-            // Starting with smaller orbit configurations (r: 10-12)
             const configs = [{c:0xff007b, r:10}, {c:0x7000ff, r:12}, {c:0xffd700, r:11}];
             configs.forEach((cfg, i) => {
                 const orb = new THREE.Group();
@@ -193,7 +206,7 @@
             if (isUnfolded && !isSpelling) {
                 if (raycaster.intersectObjects(artifact.children, true).length > 0) {
                     isSpelling = true;
-                    artifact.children.forEach(c => { if(c.isMesh && c.material) gsap.to(c.material, { opacity: 0.005, duration: 2 }); });
+                    artifact.children.forEach(c => { if(c.isMesh && c.material) gsap.to(c.material, { opacity: 0.05, duration: 2 }); });
                     gsap.to(nebula.material, { opacity: 1, duration: 1 });
                     gsap.to(buttonBox.material, { opacity: 0.6, duration: 1.5, delay: 0.5 });
                     return;
@@ -296,8 +309,6 @@
             orbs.forEach(o => {
                 o.data.a += 0.01;
                 let t = isWarping ? warpProgress : 0;
-                // START SMALL (o.data.r) -> EXPAND TO LARGE (o.data.r + 10)
-                // This uses t (warpProgress) to drive the expansion during the warp sequence
                 let currentR = THREE.MathUtils.lerp(o.data.r, o.data.r + 10, Math.pow(t, 1.5));
                 o.position.x = Math.cos(o.data.a) * currentR;
                 o.position.y = Math.sin(o.data.a * 0.6) * THREE.MathUtils.lerp(4, 8, t);
