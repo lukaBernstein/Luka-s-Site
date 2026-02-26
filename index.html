@@ -91,38 +91,41 @@
             0% { top: 225vh; }
             100% { top: -15000px; }
         }
-
-    
-  /* MOBILE FIXES */
+/* MOBILE FIXES */
 @media screen and (max-width: 768px) {
     .star-wars-stage { 
-        /* Increased to 3000px to push the camera much further back */
         perspective: 3000px; 
         perspective-origin: 50% 100%;
     }
 
     .crawl-plane { 
-        width: 95%; 
-        /* Steeper angle (45deg) works better when the camera is further away */
+        /* Widened the plane to 100% to ensure no clipping */
+        width: 100%; 
         transform: rotateX(45deg); 
         transform-origin: 50% 0%;
         z-index: 150;
     }
 
     .crawl-content { 
-        font-size: 2.2rem; /* Increased size because the distant camera makes text look smaller */
-        top: 100vh; 
+        font-size: 2rem; 
+        top: 110vh; 
         line-height: 1.4; 
         font-weight: 900;
+        
+        /* ADDED THESE TWO LINES TO FIX THE EDGES: */
+        width: 90%;          /* Make the text slightly narrower than the plane */
+        margin: 0 auto;      /* Center the text within the plane */
+        
+        text-align: center;  /* Center alignment is safer for mobile edges than justify */
         letter-spacing: 0.07em; 
-        -webkit-font-smoothing: antialiased;
         text-shadow: 0 0 2px rgba(254, 218, 74, 0.8); 
         backface-visibility: hidden;
     }
 
     .title h1 { 
-        font-size: 3.8rem; 
-        font-weight: 900;
+        font-size: 3.5rem; 
+        width: 100%;
+        text-align: center;
         transform: scaleY(1.5); 
     }
 
@@ -132,7 +135,6 @@
 
     @keyframes scroll-up-mobile {
         0% { 
-            /* Start at 110vh so it's just below the camera lens at this distance */
             top: 110vh; 
             transform: scale(1); 
         }
@@ -142,6 +144,8 @@
         }
     }
 }
+    
+  
 </style>
 </style>
 </head>
