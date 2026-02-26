@@ -13,7 +13,7 @@
         body { margin: 0; background: #000; overflow: hidden; cursor: crosshair; }
         canvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: block; }
 
-        /* ADDED: Transition Overlay */
+        /* Transition Overlay */
         #transition-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: black; z-index: 200; pointer-events: none; opacity: 0;
@@ -126,7 +126,7 @@
         const tileGroup = new THREE.Group();
         const sharedTileGeo = new THREE.SphereGeometry(0.35, 12, 12); 
 
-        // ADDED: Terrain Globals
+        // Terrain Globals
         let isTerrainMode = false;
         const simplex = new SimplexNoise();
         const terrainTiles = new Map();
@@ -185,7 +185,8 @@
 
         function createNebula() {
             const resumeTargets = getCoords('RESUME', 160, 0.035);
-            const creditsTargets = getCoords('ROLL CREDITS', 120, 0.030);
+            // CHANGED: "ROLL CREDITS" -> "CREDITS" and adjusted size to match RESUME
+            const creditsTargets = getCoords('CREDITS', 160, 0.035); 
             const count = 9000; 
             const geo = new THREE.BufferGeometry();
             const pos = new Float32Array(count * 3);
@@ -307,11 +308,11 @@
                 const container = document.getElementById('crawl-container');
                 container.style.display = 'block';
                 container.classList.add('crawl-active');
-                setTimeout(() => { revealPanel(); }, 18000);
-            }, 2000); 
+                setTimeout(() => { revealPanel(); }, 20000);
+            }, 3200); 
         }
 
-        // ADDED: Terrain Setup and Logic Functions
+        // Terrain Setup and Logic Functions
         function startTerrainTransition() {
             const overlay = document.getElementById('transition-overlay');
             panelReady = false; 
@@ -518,7 +519,6 @@
             if (panelReady) {
                 const panelHit = raycaster.intersectObjects(panelGroup.children);
                 if (panelHit.length > 0) {
-                    // CHANGED: Trigger Transition instead of reload
                     startTerrainTransition();
                     return;
                 }
@@ -582,7 +582,6 @@
             requestAnimationFrame(animate);
             const timeNow = clock.getElapsedTime();
 
-            // ADDED: Logic router for the two different scenes
             if (isTerrainMode) {
                 camera.position.z -= 1.35;
                 camera.position.x = Math.sin(timeNow * 0.3) * 25; 
@@ -618,7 +617,8 @@
                 }
 
                 if(isWarping && !arrived) {
-                    camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 60);
+                    // CHANGED: Increased the FOV multiplier from 60 to 85 for a more extreme warp
+                    camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 85);
                     camera.updateProjectionMatrix();
                 } else if (arrived) {
                     camera.fov = THREE.MathUtils.lerp(camera.fov, 75, 0.1);
