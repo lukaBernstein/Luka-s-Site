@@ -106,17 +106,17 @@
     }
 
     .crawl-content { 
-        /* Reduced from 2.2rem to 1.1rem (50% smaller) */
         font-size: 1.1rem; 
-        
-        /* Adjusted width to 95% to let text spread further to the edges */
-        width: 95%; 
-        margin: 0 auto;
+        /* centering logic */
+        width: 90%;
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%); 
         
         top: 105vh; 
         line-height: 1.5; 
         font-weight: 900;
-        text-align: center;
+        text-align: center; /* Ensures text block is visually balanced */
         letter-spacing: 0.05em; 
         -webkit-font-smoothing: antialiased;
         text-shadow: 0 0 2px rgba(254, 218, 74, 0.8); 
@@ -124,35 +124,32 @@
     }
 
     .title h1 { 
-        /* Scaled down the title to match the new proportions */
         font-size: 2.2rem; 
         font-weight: 900;
+        /* Horizontal centering for the title specifically */
+        width: 100%;
+        text-align: justify;
         transform: scaleY(1.4); 
-        margin-bottom: 100px; /* Reduced margin for the smaller font */
-    }
-
-    .title p {
-        font-size: 1rem;
-        margin-bottom: 5px;
+        margin-bottom: 100px;
     }
 
     .crawl-active .crawl-content {
+        /* We use a separate mobile animation to preserve the horizontal center */
         animation: scroll-up-mobile 140s linear forwards;
     }
 
     @keyframes scroll-up-mobile {
         0% { 
             top: 105vh; 
-            /* Kept scale at 1.0 to prevent it from getting too large at the start */
-            transform: scale(1); 
+            /* Added translateX(-50%) here to keep it centered during the crawl */
+            transform: translateX(-50%) scale(1); 
         }
         100% { 
             top: -15000px; 
-            transform: scale(0.5); 
+            transform: translateX(-50%) scale(0.5); 
         }
     }
 }
-    
   
 </style>
 </style>
