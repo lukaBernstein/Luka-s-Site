@@ -551,6 +551,9 @@ if (window.innerWidth < 768) {
             sweepLight.position.set(-20, 10, -5); scene.add(sweepLight);
             artifact = createObsidianPolyhedron();
             nebula = createNebula(); artifact.add(nebula);
+            if (window.innerWidth < 768) {
+    nebula.scale.set(1.2, 1.2, 1.2); // Make the text 20% larger to compensate for the zoom-out
+}
             artifact.position.z = -1500; artifact.visible = false;
             mainGroup.add(artifact);
             const boxGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(24, 8));
@@ -783,6 +786,15 @@ if (window.innerWidth < 768) {
             if (s.position.z > 50) {
                 resetStar(s);
                 if (isWarping) s.position.z = -4000;
+                if (isWarping && !arrived) {
+    camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 85);
+    camera.updateProjectionMatrix();
+} else if (arrived) {
+    // ADJUST THIS: Use 90 for mobile to create a "Wide Angle" zoom-out effect
+    const targetFOV = window.innerWidth < 768 ? 90 : 75;
+    camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, 0.1);
+    camera.updateProjectionMatrix();
+}
             }
         }
 
