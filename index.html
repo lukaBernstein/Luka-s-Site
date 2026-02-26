@@ -23,7 +23,7 @@
 
         #crawl-container {
             display: none; 
-            opacity: 0; /* Added for smooth fade-in */
+            opacity: 0; 
             position: fixed;
             top: 0;
             left: 0;
@@ -91,51 +91,17 @@
             0% { top: 225vh; }
             100% { top: -15000px; }
         }
-        /* Mobile Styles (Phones) */
-@media screen and (max-width: 768px) {
-    .crawl-content {
-        font-size: 1.8rem; /* Smaller text for small screens */
-        line-height: 1.2;
-    }
 
-    .title h1 {
-        font-size: 3.5rem; /* Shrink the 'LUKA BERNSTEIN' header */
-    }
-
-    .star-wars-stage {
-        perspective: 800px; /* Pulls camera back specifically for mobile aspect ratios */
-    }
-
-    .crawl-plane {
-        width: 90%; /* Give text more room on narrow screens */
-    }
-}
-@media screen and (max-width: 768px) {
-    /* Adjust the 3D depth for narrow screens */
-    .star-wars-stage {
-        perspective: 1000px; 
-    }
-
-    .crawl-plane {
-        width: 90%; /* Use more of the screen width */
-        transform: rotateX(60deg); /* Slightly less tilt so it stays in view */
-    }
-
-    /* Shrink font sizes so words don't break awkwardly */
-    .crawl-content {
-        font-size: 1.6rem; 
-        top: 150vh; /* Adjust start position for the smaller screen height */
-    }
-
-    .title h1 {
-        font-size: 3.5rem; 
-    }
-
-    @keyframes scroll-up {
-        0% { top: 150vh; }
-        100% { top: -10000px; }
-    }
-}
+        @media screen and (max-width: 768px) {
+            .crawl-content { font-size: 1.6rem; top: 150vh; line-height: 1.2; }
+            .title h1 { font-size: 3.5rem; }
+            .star-wars-stage { perspective: 1000px; }
+            .crawl-plane { width: 90%; transform: rotateX(60deg); }
+            @keyframes scroll-up {
+                0% { top: 150vh; }
+                100% { top: -10000px; }
+            }
+        }
     </style>
 </head>
 <body>
@@ -164,7 +130,7 @@
     <script>
         let scene, camera, renderer, clock, tiles = [], starObjects = [], orbs = [], namePlane, glowPlane, nameLight, sweepLight;
         let artifact, nebula, buttonBox, isWarping = false, arrived = false, isUnfolded = false, isSpelling = false, isCredits = false, isPanning = false;
-        let warpProgress = 0, mainGroup, starGroup; // Added starGroup
+        let warpProgress = 0, mainGroup, starGroup; 
 
         let panelGroup, outerWire, innerWire, panelTextMesh, panelReady = false;
         
@@ -180,6 +146,8 @@
         const terrainTiles = new Map();
         const TILE_SIZE = 150, TILE_RES = 64, GRID_RADIUS = 2, VOID_PURPLE = 0x05020a;
         let terrainStars;
+
+        const isMobile = () => window.innerWidth < 768;
 
         function getCoords(text, size, spacing) {
             const canvas = document.createElement('canvas');
@@ -233,7 +201,6 @@
 
         function createNebula() {
             const resumeTargets = getCoords('RESUME', 160, 0.035);
-            // CHANGED: CREDITS -> MORE!
             const creditsTargets = getCoords('MORE!', 160, 0.035); 
             const count = 9000; 
             const geo = new THREE.BufferGeometry();
@@ -303,64 +270,42 @@
         }
 
         function createPanelButton() {
-    panelGroup = new THREE.Group();
-    panelGroup.visible = false;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    // Texture resolution
-    canvas.width = 2048; 
-    canvas.height = 512;
-    
-    // Panel dimensions
-    const panelWidth = 42; 
-    const panelHeight = 5.2;
-    
-    const outerGeo = new THREE.BoxGeometry(panelWidth, panelHeight, 0.5);
-    outerWire = new THREE.LineSegments(new THREE.EdgesGeometry(outerGeo), new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0 }));
-    
-    const innerGeo = new THREE.BoxGeometry(panelWidth - 0.8, panelHeight - 0.8, 0.2);
-    innerWire = new THREE.LineSegments(new THREE.EdgesGeometry(innerGeo), new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0 }));
-    
-    const glassMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 });
-    const glassPanel = new THREE.Mesh(new THREE.PlaneGeometry(panelWidth, panelHeight), glassMat);
-    
-    const faceMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
-    
-    // Text Mesh sizing
-    panelTextMesh = new THREE.Mesh(new THREE.PlaneGeometry(41.5, panelHeight - 0.5), faceMat);
-    panelTextMesh.position.z = 0.3;
-    panelTextMesh.scale.y = 1.45; 
-    
-    document.fonts.load('900 90px Inter').then(() => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#00ff41';
-        
-        ctx.font = '900 90px Inter, sans-serif'; 
-        ctx.textAlign = 'center'; 
-        ctx.textBaseline = 'middle';
-        ctx.shadowColor = '#00ff41'; 
-        ctx.shadowBlur = 10;
-        
-        ctx.fillText('SHOW ME WHAT ELSE THIS GUY CAN DO!', 1024, 256);
-        faceMat.map = new THREE.CanvasTexture(canvas);
-        faceMat.needsUpdate = true;
-    });
+            panelGroup = new THREE.Group();
+            panelGroup.visible = false;
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 2048; canvas.height = 512;
+            const panelWidth = 42; const panelHeight = 5.2;
+            
+            const outerGeo = new THREE.BoxGeometry(panelWidth, panelHeight, 0.5);
+            outerWire = new THREE.LineSegments(new THREE.EdgesGeometry(outerGeo), new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0 }));
+            const innerGeo = new THREE.BoxGeometry(panelWidth - 0.8, panelHeight - 0.8, 0.2);
+            innerWire = new THREE.LineSegments(new THREE.EdgesGeometry(innerGeo), new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0 }));
+            const glassPanel = new THREE.Mesh(new THREE.PlaneGeometry(panelWidth, panelHeight), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 }));
+            const faceMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
+            
+            panelTextMesh = new THREE.Mesh(new THREE.PlaneGeometry(41.5, panelHeight - 0.5), faceMat);
+            panelTextMesh.position.z = 0.3;
+            panelTextMesh.scale.y = 1.45; 
+            
+            document.fonts.load('900 90px Inter').then(() => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#00ff41';
+                ctx.font = '900 90px Inter, sans-serif'; 
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.shadowColor = '#00ff41'; ctx.shadowBlur = 10;
+                ctx.fillText('SHOW ME WHAT ELSE THIS GUY CAN DO!', 1024, 256);
+                faceMat.map = new THREE.CanvasTexture(canvas);
+                faceMat.needsUpdate = true;
+            });
 
-    panelGroup.add(outerWire, innerWire, glassPanel, panelTextMesh);
-    camera.add(panelGroup);
+            panelGroup.add(outerWire, innerWire, glassPanel, panelTextMesh);
+            camera.add(panelGroup);
+            panelGroup.position.set(0, 0, -25);
+            if (isMobile()) panelGroup.scale.set(0.6, 0.6, 0.6);
+            return panelGroup;
+        }
 
-    // FIXED: Centered at 0 Y-axis and 0 rotation
-    panelGroup.position.set(0, 0, -25);
-    panelGroup.rotation.set(0, 0, 0);
-
-    // Inside createPanelButton, before return panelGroup;
-if (window.innerWidth < 768) {
-    panelGroup.scale.set(0.6, 0.6, 0.6); // Shrink the button to 60% size
-}
-
-    return panelGroup;
-}
         function revealPanel() {
             panelGroup.visible = true;
             panelReady = true;
@@ -373,58 +318,35 @@ if (window.innerWidth < 768) {
         function rollCreditsSequence() {
             if (isPanning) return;
             isPanning = true;
-
             const container = document.getElementById('crawl-container');
             container.style.display = 'block';
-            
-            // FADE IN container to prevent pop-in of the fade gradient
             gsap.to(container, { opacity: 1, duration: 4, ease: "power2.inOut" });
-
             gsap.to(camera.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
             gsap.to(camera.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
-            
-            // FIX: Move starGroup with the camera so the starfield stays behind the credits
             gsap.to(starGroup.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
             gsap.to(starGroup.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
-            
-            // Pan only the polyhedron and orbs away, leave the starGroup alone
             gsap.to(mainGroup.position, { y: -500, z: -500, duration: 3, ease: "power3.in" });
             gsap.to(tileGroup.position, { y: -500, duration: 3, ease: "power3.in" });
-            
             setTimeout(() => {
                 container.classList.add('crawl-active');
                 setTimeout(() => { revealPanel(); }, 25000);
             }, 3200); 
         }
 
-        // Terrain Setup and Logic Functions
         function startTerrainTransition() {
             const overlay = document.getElementById('transition-overlay');
             panelReady = false; 
-
-            // Fade Button and Screen to Black
             gsap.to([outerWire.material, panelTextMesh.material], { opacity: 0, duration: 1.0 });
             gsap.to(panelGroup.position, { z: -50, duration: 1.5, ease: "power2.in" });
-            
             gsap.to(overlay, { 
                 opacity: 1, 
                 duration: 1.5, 
                 onComplete: () => {
-                    // Cleanup Scene 1
-                    scene.remove(mainGroup);
-                    scene.remove(starGroup); // Added
-                    scene.remove(tileGroup);
-                    scene.remove(namePlane);
-                    scene.remove(glowPlane);
-                    scene.remove(nameLight);
-                    scene.remove(sweepLight);
-                    camera.remove(panelGroup);
+                    scene.remove(mainGroup); scene.remove(starGroup); scene.remove(tileGroup);
+                    scene.remove(namePlane); scene.remove(glowPlane); scene.remove(nameLight);
+                    scene.remove(sweepLight); camera.remove(panelGroup);
                     document.getElementById('crawl-container').style.display = 'none';
-
-                    // Prepare Scene 2
                     setupScene2();
-                    
-                    // Reveal Terrain
                     gsap.to(overlay, { opacity: 0, duration: 2, delay: 0.5 });
                     gsap.to(scene.fog, { density: 0.007, duration: 4, ease: "sine.inOut" });
                 }
@@ -435,29 +357,21 @@ if (window.innerWidth < 768) {
             isTerrainMode = true;
             scene.background = new THREE.Color(VOID_PURPLE);
             scene.fog = new THREE.FogExp2(VOID_PURPLE, 0.1); 
-
-            camera.position.set(0, 21.8, 0);
+            
+            // Adjust camera for mobile in terrain mode
+            const height = isMobile() ? 35 : 21.8;
+            camera.position.set(0, height, 0);
             camera.rotation.set(-0.10, 0, 0);
-            camera.fov = 85;
+            camera.fov = isMobile() ? 95 : 85;
             camera.updateProjectionMatrix();
 
             const starGeo = new THREE.BufferGeometry();
             const posArray = new Float32Array(40000 * 3);
             for (let i = 0; i < 40000 * 3; i++) posArray[i] = (Math.random() - 0.5) * 3500;
             starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-            
-            // FIX: Prevent stars from showing through terrain by disabling depthWrite and setting renderOrder
-            terrainStars = new THREE.Points(starGeo, new THREE.PointsMaterial({ 
-                color: 0xffffff, 
-                size: 2.8, 
-                transparent: true, 
-                sizeAttenuation: false,
-                depthWrite: false 
-            }));
-            terrainStars.renderOrder = -1; // Force background rendering
-            
+            terrainStars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2.8, transparent: true, sizeAttenuation: false, depthWrite: false }));
+            terrainStars.renderOrder = -1; 
             scene.add(terrainStars);
-
             scene.add(new THREE.HemisphereLight(0x443366, 0x330000, 1.5));
             scene.add(new THREE.AmbientLight(0x442222, 0.3));
             const sun = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -513,7 +427,7 @@ if (window.innerWidth < 768) {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
             mainGroup = new THREE.Group(); scene.add(mainGroup);
-            starGroup = new THREE.Group(); scene.add(starGroup); // Added
+            starGroup = new THREE.Group(); scene.add(starGroup);
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
             camera.position.z = 10;
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
@@ -529,93 +443,72 @@ if (window.innerWidth < 768) {
                 resetStar(star, true);
                 star.userData = { speed: Math.random() * 0.2 + 0.1 };
                 star.frustumCulled = false; 
-                starObjects.push(star); starGroup.add(star); // Added to starGroup
+                starObjects.push(star); starGroup.add(star);
             }
 
-            const nameMat = new THREE.MeshStandardMaterial({ 
-                map: createNameTexture('LUKA BERNSTEIN'), 
-                transparent: true, color: 0xffd966, emissive: 0xffaa00,
-                emissiveIntensity: 0.45, roughness: 0.1, metalness: 0.8,
-                opacity: 0 
-            });
-            namePlane = new THREE.Mesh(new THREE.PlaneGeometry(35, 10), nameMat);
-            namePlane.position.z = 200; 
-            scene.add(namePlane);
-            glowPlane = createAuraMesh();
-            glowPlane.position.z = 200;
-            glowPlane.material.opacity = 0;
-            scene.add(glowPlane);
-            nameLight = new THREE.PointLight(0xffcc00, 0, 60); 
-            nameLight.position.set(0, 0, -4.5); scene.add(nameLight);
-            sweepLight = new THREE.PointLight(0xffffff, 0, 45);
-            sweepLight.position.set(-20, 10, -5); scene.add(sweepLight);
+            namePlane = new THREE.Mesh(new THREE.PlaneGeometry(35, 10), new THREE.MeshStandardMaterial({ map: createNameTexture('LUKA BERNSTEIN'), transparent: true, color: 0xffd966, emissive: 0xffaa00, emissiveIntensity: 0.45, roughness: 0.1, metalness: 0.8, opacity: 0 }));
+            namePlane.position.z = 200; scene.add(namePlane);
+            glowPlane = createAuraMesh(); glowPlane.position.z = 200; glowPlane.material.opacity = 0; scene.add(glowPlane);
+            nameLight = new THREE.PointLight(0xffcc00, 0, 60); nameLight.position.set(0, 0, -4.5); scene.add(nameLight);
+            sweepLight = new THREE.PointLight(0xffffff, 0, 45); sweepLight.position.set(-20, 10, -5); scene.add(sweepLight);
+            
             artifact = createObsidianPolyhedron();
             nebula = createNebula(); artifact.add(nebula);
-            if (window.innerWidth < 768) {
-    nebula.scale.set(1.2, 1.2, 1.2); // Make the text 20% larger to compensate for the zoom-out
-}
+            if (isMobile()) nebula.scale.set(1.2, 1.2, 1.2);
             artifact.position.z = -1500; artifact.visible = false;
             mainGroup.add(artifact);
-            const boxGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(24, 8));
-            buttonBox = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({ color: 0xffd966, transparent: true, opacity: 0 }));
-            buttonBox.position.set(0, 0.2, 0.5); nebula.add(buttonBox);
-            buttonBox.visible = false; // Add this line to hide the box
+            buttonBox = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(24, 8)), new THREE.LineBasicMaterial({ color: 0xffd966, transparent: true, opacity: 0 }));
+            buttonBox.position.set(0, 0.2, 0.5); nebula.add(buttonBox); buttonBox.visible = false;
+            
             const configs = [{c:0xff007b, r:14, t:'h', s:0.008}, {c:0x7000ff, r:18, t:'h', s:0.006}, {c:0xffd700, r:16, t:'h', s:0.007}, {c:0x00ffff, r:15, t:'v', s:0.009}];
             configs.forEach((cfg, i) => {
                 const orb = new THREE.Group();
-                orb.add(new THREE.PointLight(cfg.c, 300, 60)); 
-                orb.add(new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), new THREE.MeshBasicMaterial({ color: cfg.c })));
-                orb.data = { a: i * 2, r: cfg.r, type: cfg.t, speed: cfg.s }; 
-                orbs.push(orb); mainGroup.add(orb);
+                orb.add(new THREE.PointLight(cfg.c, 300, 60)); orb.add(new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), new THREE.MeshBasicMaterial({ color: cfg.c })));
+                orb.data = { a: i * 2, r: cfg.r, type: cfg.t, speed: cfg.s }; orbs.push(orb); mainGroup.add(orb);
             });
+            
             generateGrid(); 
-            scene.add(tileGroup);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.45)); 
+            scene.add(tileGroup); scene.add(new THREE.AmbientLight(0xffffff, 0.45)); 
             createPanelButton();
-            scene.add(camera);
-            renderer.compile(scene, camera);
+            scene.add(camera); renderer.compile(scene, camera);
+            
             gsap.to(namePlane.position, { z: -8, duration: 1.8, ease: "power4.out" });
             gsap.to(namePlane.material, { opacity: 1, duration: 1.2, delay: 0.2 });
             gsap.to(glowPlane.position, { z: -8.2, duration: 1.8, ease: "power4.out" });
             gsap.to(glowPlane.material, { opacity: 0.42, duration: 1.2, delay: 0.4 });
             gsap.to(nameLight, { intensity: 280, duration: 2, delay: 0.5 });
             gsap.to(sweepLight, { intensity: 880, duration: 2, delay: 0.6 });
+            
             tiles.forEach(t => {
-                const finalZ = t.position.z;
-                t.position.z = 300 + (Math.random() * 200);
-                t.material.opacity = 0;
+                const finalZ = t.position.z; t.position.z = 300 + (Math.random() * 200); t.material.opacity = 0;
                 gsap.to(t.position, { z: finalZ, duration: 2.2 + Math.random(), ease: "power3.out", delay: Math.random() * 0.5 });
                 gsap.to(t.material, { opacity: 0.4, duration: 1.5, delay: 0.8 + Math.random() * 0.5 });
             });
+            
             window.addEventListener('mousemove', (e) => { mouse.x = (e.clientX/window.innerWidth)*2-1; mouse.y = -(e.clientY/window.innerHeight)*2+1; });
             window.addEventListener('click', onClick);
             window.addEventListener('resize', onResize);
+            
+            if (isMobile()) {
+                const mobileScale = window.innerWidth / 768; 
+                namePlane.scale.set(mobileScale, mobileScale, 1);
+                glowPlane.scale.set(mobileScale, mobileScale, 1);
+            }
             animate();
-
-            if (window.innerWidth < 768) {
-    const mobileScale = window.innerWidth / 768; 
-    namePlane.scale.set(mobileScale, mobileScale, 1);
-    glowPlane.scale.set(mobileScale, mobileScale, 1);
-}
         }
 
         function generateGrid() {
             const tileMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, metalness: 1.0, roughness: 0.05 });
-            while(tileGroup.children.length > 0) {
-                const child = tileGroup.children[0];
-                tileGroup.remove(child);
-            }
+            while(tileGroup.children.length > 0) tileGroup.remove(tileGroup.children[0]);
             tiles = [];
             const spacing = 0.65;
             const h = 2 * Math.tan((camera.fov * Math.PI) / 360) * 10;
             const w = h * (window.innerWidth / window.innerHeight);
-            const cg = Math.ceil(w / spacing) + 12;
-            const rg = Math.ceil(h / spacing) + 8;
+            const cg = Math.ceil(w / spacing) + 12; const rg = Math.ceil(h / spacing) + 8;
             for (let x = -cg/2; x < cg/2; x++) {
                 for (let y = -rg/2; y < rg/2; y++) {
                     const tile = new THREE.Mesh(sharedTileGeo, tileMat);
-                    tile.position.set(x * spacing, y * spacing, 0);
-                    tile.scale.set(1, 1, 0.2); 
+                    tile.position.set(x * spacing, y * spacing, 0); tile.scale.set(1, 1, 0.2); 
                     tileGroup.add(tile); tiles.push(tile);
                 }
             }
@@ -624,22 +517,17 @@ if (window.innerWidth < 768) {
         function onClick() {
             raycaster.setFromCamera(mouse, camera);
             if (panelReady) {
-                const panelHit = raycaster.intersectObjects(panelGroup.children);
-                if (panelHit.length > 0) {
-                    startTerrainTransition();
-                    return;
-                }
+                if (raycaster.intersectObjects(panelGroup.children).length > 0) { startTerrainTransition(); return; }
             }
             if (isSpelling) {
                 if (raycaster.intersectObjects([nebula, buttonBox], true).length > 0) {
-                    if (!isCredits) { downloadResume(); } else { rollCreditsSequence(); }
+                    if (!isCredits) downloadResume(); else rollCreditsSequence();
                     return;
                 }
             }
             if (arrived && !isUnfolded) {
                 if (raycaster.intersectObjects(artifact.children, true).length > 0) {
-                    isUnfolded = true;
-                    gsap.to(nebula.material, { opacity: 0.35, duration: 2.5 });
+                    isUnfolded = true; gsap.to(nebula.material, { opacity: 0.35, duration: 2.5 });
                     artifact.children.forEach(c => {
                         if(c.userData.offsetDir) {
                             _v3.copy(c.userData.offsetDir).multiplyScalar(14.5);
@@ -651,11 +539,8 @@ if (window.innerWidth < 768) {
             }
             if (isUnfolded && !isSpelling) {
                 if (raycaster.intersectObjects(artifact.children, true).length > 0) {
-                    isSpelling = true;
-                    artifact.children.forEach(c => { if(c.isMesh && c.material) gsap.to(c.material, { opacity: 0.05, duration: 2 }); });
-                    gsap.to(nebula.material, { opacity: 1, duration: 1 });
-                    //gsap.to(buttonBox.material, { opacity: 0.6, duration: 1.5, delay: 0.5 });
-                    return;
+                    isSpelling = true; artifact.children.forEach(c => { if(c.isMesh && c.material) gsap.to(c.material, { opacity: 0.05, duration: 2 }); });
+                    gsap.to(nebula.material, { opacity: 1, duration: 1 }); return;
                 }
             }
             if (!isWarping && raycaster.intersectObject(namePlane).length > 0) {
@@ -666,165 +551,115 @@ if (window.innerWidth < 768) {
                 gsap.to([nameLight, sweepLight], { intensity: 0, duration: 1.2 });
                 tiles.forEach(t => {
                     const delay = Math.random() * 0.4;
-                    const flyX = (t.position.x * 20);
-                    const flyY = (t.position.y * 20);
-                    gsap.to(t.position, { x: flyX, y: flyY, z: 100, duration: 2.4, delay: delay, ease: "power2.in" });
+                    gsap.to(t.position, { x: t.position.x * 20, y: t.position.y * 20, z: 100, duration: 2.4, delay: delay, ease: "power2.in" });
                     gsap.to(t.scale, { x: 3, y: 3, duration: 2.4, delay: delay });
                     gsap.to(t.rotation, { x: Math.random() * 12, y: Math.random() * 12, duration: 2.4, delay: delay });
                     gsap.to(t.material, { opacity: 0, duration: 1.2, delay: delay + 1.2 });
                 });
                 gsap.to(window, { duration: 4.0, onUpdate: function() { warpProgress = this.progress(); }, onComplete: () => arrived = true });
-                starObjects.forEach(s => {
-                    gsap.to(s.scale, { z: 150, duration: 1.0 });
-                    gsap.to(s.scale, { z: 1, duration: 0.5, delay: 3.2 });
-                });
+                starObjects.forEach(s => { gsap.to(s.scale, { z: 150, duration: 1.0 }); gsap.to(s.scale, { z: 1, duration: 0.5, delay: 3.2 }); });
                 setTimeout(() => { 
                     artifact.visible = true; 
-                    const targetZ = window.innerWidth < 768 ? -25 : -15;
-                    gsap.to(artifact.position, { z: -15, duration: 1.5, ease: "power3.out" }); 
+                    const targetZ = isMobile() ? -25 : -15; // Move further back on mobile
+                    gsap.to(artifact.position, { z: targetZ, duration: 1.5, ease: "power3.out" }); 
                 }, 2800);
             }
         }
 
-       function animate() {
-    requestAnimationFrame(animate);
-    const timeNow = clock.getElapsedTime();
+        function animate() {
+            requestAnimationFrame(animate);
+            const timeNow = clock.getElapsedTime();
 
-    if (isTerrainMode) {
-        camera.position.z -= 1.35;
-        camera.position.x = Math.sin(timeNow * 0.3) * 25; 
-        camera.rotation.z = Math.sin(timeNow * 0.3) * 0.08; 
-        terrainStars.position.z = camera.position.z - 1500;
-        terrainStars.position.x = camera.position.x * 0.95; 
-        updateTerrainGrid();
-    } else {
-        if (namePlane && !isWarping) {
-            const pingPong = Math.sin(timeNow * 1.2); 
-            sweepLight.position.x = pingPong * 28; 
-            sweepLight.position.y = -pingPong * 10; 
-            const breath = 0.45 + ((Math.sin(timeNow * 2.2) + 1) / 2) * 0.40; 
-            glowPlane.material.opacity = 0.3 + (0.28 * breath); 
-            glowPlane.scale.set(1.08 + (breath * 0.07), 1.08 + (breath * 0.07), 1);
-            nameLight.intensity = (230 + (breath * 165)); 
-            namePlane.material.emissiveIntensity = 0.45 + (breath * 0.38);
-            const tx = mouse.x * 10, ty = mouse.y * 6;
-            for(let i=0; i<tiles.length; i++){
-                const tile = tiles[i];
-                if(Math.abs(tile.position.z) < 5) {
-                    const d = Math.sqrt((tile.position.x - tx)**2 + (tile.position.y - ty)**2);
-                    if (d < 4) {
-                        const f = (4 - d) / 4;
-                        tile.position.z = THREE.MathUtils.lerp(tile.position.z, f * 3, 0.1);
-                        tile.material.opacity = 0.4 + (f * 0.3);
-                    } else {
-                        tile.position.z = THREE.MathUtils.lerp(tile.position.z, 0, 0.08);
-                        tile.material.opacity = 0.4;
+            if (isTerrainMode) {
+                camera.position.z -= 1.35;
+                camera.position.x = Math.sin(timeNow * 0.3) * 25; 
+                camera.rotation.z = Math.sin(timeNow * 0.3) * 0.08; 
+                terrainStars.position.z = camera.position.z - 1500;
+                terrainStars.position.x = camera.position.x * 0.95; 
+                updateTerrainGrid();
+            } else {
+                if (namePlane && !isWarping) {
+                    const breath = 0.45 + ((Math.sin(timeNow * 2.2) + 1) / 2) * 0.40; 
+                    sweepLight.position.set(Math.sin(timeNow * 1.2) * 28, -Math.sin(timeNow * 1.2) * 10, -5);
+                    glowPlane.material.opacity = 0.3 + (0.28 * breath); 
+                    glowPlane.scale.set(1.08 + (breath * 0.07), 1.08 + (breath * 0.07), 1);
+                    nameLight.intensity = 230 + (breath * 165); 
+                    namePlane.material.emissiveIntensity = 0.45 + (breath * 0.38);
+                    const tx = mouse.x * 10, ty = mouse.y * 6;
+                    tiles.forEach(tile => {
+                        if(Math.abs(tile.position.z) < 5) {
+                            const d = Math.sqrt((tile.position.x - tx)**2 + (tile.position.y - ty)**2);
+                            if (d < 4) {
+                                tile.position.z = THREE.MathUtils.lerp(tile.position.z, (4 - d)/4 * 3, 0.1);
+                                tile.material.opacity = 0.4 + ((4-d)/4 * 0.3);
+                            } else {
+                                tile.position.z = THREE.MathUtils.lerp(tile.position.z, 0, 0.08);
+                                tile.material.opacity = 0.4;
+                            }
+                        }
+                    });
+                }
+
+                // Handle FOV Transitions
+                if(isWarping && !arrived) {
+                    camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 85);
+                    camera.updateProjectionMatrix();
+                } else if (arrived) {
+                    const targetFOV = isMobile() ? 90 : 75;
+                    camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, 0.1);
+                    camera.updateProjectionMatrix();
+                }
+
+                orbs.forEach(o => {
+                    o.data.a += o.data.speed;
+                    let currentR = THREE.MathUtils.lerp(o.data.r, o.data.r + 5, isWarping ? warpProgress : 0);
+                    const sinA = Math.sin(o.data.a); const zPos = THREE.MathUtils.lerp(-8, -15, isWarping ? warpProgress : 0);
+                    if(o.data.type === 'v') { o.position.set(Math.sin(o.data.a * 0.3) * 3, Math.cos(o.data.a) * currentR, zPos + (sinA * currentR * 1.2)); }
+                    else { o.position.set(Math.cos(o.data.a) * currentR, Math.sin(o.data.a * 0.5) * 4, zPos + (sinA * currentR * 1.1)); }
+                });
+
+                if (isSpelling) {
+                    const posAttr = nebula.geometry.attributes.position, colAttr = nebula.geometry.attributes.color;
+                    const tarAttr = isCredits ? nebula.geometry.attributes.creditsTarget : nebula.geometry.attributes.target;
+                    for (let i = 0; i < posAttr.count; i++) {
+                        const i3 = i * 3;
+                        posAttr.array[i3] = THREE.MathUtils.lerp(posAttr.array[i3], tarAttr.array[i3], 0.015);
+                        posAttr.array[i3+1] = THREE.MathUtils.lerp(posAttr.array[i3+1], tarAttr.array[i3+1], 0.015);
+                        posAttr.array[i3+2] = THREE.MathUtils.lerp(posAttr.array[i3+2], tarAttr.array[i3+2], 0.015);
+                        const wave = Math.sin(i * 0.8 + timeNow * 8.0); const flash = Math.pow(Math.max(0, wave), 8) * 1.5; 
+                        colAttr.array[i3] = 1.0 * (0.02 + flash); colAttr.array[i3+1] = 0.85 * (0.02 + flash); colAttr.array[i3+2] = 0.2 * (0.02 + flash);
                     }
+                    posAttr.needsUpdate = true; colAttr.needsUpdate = true;
+                    nebula.rotation.set(-artifact.rotation.x, -artifact.rotation.y, -artifact.rotation.z);
+                    if (!isCredits) buttonBox.material.opacity = 0.4 + Math.sin(timeNow * 2) * 0.2;
+                }
+
+                if (panelGroup && panelGroup.visible) {
+                    panelGroup.rotation.set(THREE.MathUtils.lerp(panelGroup.rotation.x, mouse.y * 0.1, 0.1), THREE.MathUtils.lerp(panelGroup.rotation.y, mouse.x * 0.2, 0.1), 0);
+                    panelGroup.position.y = Math.sin(timeNow * 1.5) * 0.15;
+                    outerWire.material.color.setHex(raycaster.intersectObjects(panelGroup.children).length > 0 ? 0xffffff : 0x00ff41);
+                }
+
+                starObjects.forEach(s => {
+                    s.position.z += s.userData.speed + (isWarping && !arrived ? Math.pow(Math.sin(warpProgress * Math.PI), 2) * 85 : 0);
+                    if (s.position.z > 50) { resetStar(s); if (isWarping) s.position.z = -4000; }
+                });
+
+                if (artifact.visible) {
+                    artifact.rotation.y += 0.002 + mouse.x * 0.01;
+                    artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 0.4, 0.05);
                 }
             }
+            renderer.render(scene, camera);
         }
 
-        if(isWarping && !arrived) {
-            camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 85);
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.fov = window.innerWidth < window.innerHeight ? 85 : 75;
             camera.updateProjectionMatrix();
-        } else if (arrived) {
-            camera.fov = THREE.MathUtils.lerp(camera.fov, 75, 0.1);
-            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            generateGrid();
         }
-
-        for(let i=0; i<orbs.length; i++) {
-            const o = orbs[i];
-            o.data.a += o.data.speed;
-            let currentR = THREE.MathUtils.lerp(o.data.r, o.data.r + 5, isWarping ? warpProgress : 0);
-            const sinA = Math.sin(o.data.a);
-            const zPos = THREE.MathUtils.lerp(-8, -15, isWarping ? warpProgress : 0);
-            if(o.data.type === 'v') {
-                o.position.x = Math.sin(o.data.a * 0.3) * 3; o.position.y = Math.cos(o.data.a) * currentR; o.position.z = zPos + (sinA * (currentR * 1.2));
-            } else {
-                o.position.x = Math.cos(o.data.a) * currentR; o.position.y = Math.sin(o.data.a * 0.5) * 4; o.position.z = zPos + (sinA * (currentR * 1.1));
-            }
-        }
-
-        if (isSpelling) {
-            const posAttr = nebula.geometry.attributes.position;
-            const colAttr = nebula.geometry.attributes.color;
-            const tarAttr = isCredits ? nebula.geometry.attributes.creditsTarget : nebula.geometry.attributes.target;
-            for (let i = 0; i < posAttr.count; i++) {
-                const i3 = i * 3;
-                posAttr.array[i3] = THREE.MathUtils.lerp(posAttr.array[i3], tarAttr.array[i3], 0.015);
-                posAttr.array[i3+1] = THREE.MathUtils.lerp(posAttr.array[i3+1], tarAttr.array[i3+1], 0.015);
-                posAttr.array[i3+2] = THREE.MathUtils.lerp(posAttr.array[i3+2], tarAttr.array[i3+2], 0.015);
-                const wave = Math.sin(i * 0.8 + timeNow * 8.0);
-                const flash = Math.pow(Math.max(0, wave), 8) * 1.5; 
-                colAttr.array[i3] = 1.0 * (0.02 + flash); colAttr.array[i3+1] = 0.85 * (0.02 + flash); colAttr.array[i3+2] = 0.2 * (0.02 + flash);
-            }
-            posAttr.needsUpdate = true; colAttr.needsUpdate = true;
-            nebula.rotation.set(-artifact.rotation.x, -artifact.rotation.y, -artifact.rotation.z);
-            if (!isCredits) buttonBox.material.opacity = 0.4 + Math.sin(timeNow * 2) * 0.2;
-            raycaster.setFromCamera(mouse, camera);
-            const hover = raycaster.intersectObjects([nebula, buttonBox], true);
-            document.body.style.cursor = (hover.length > 0) ? 'pointer' : 'crosshair';
-        }
-
-        if (panelGroup && panelGroup.visible) {
-            panelGroup.rotation.y = THREE.MathUtils.lerp(panelGroup.rotation.y, mouse.x * 0.2, 0.1);
-            // FIXED: Removed -0.15 tilt
-            panelGroup.rotation.x = THREE.MathUtils.lerp(panelGroup.rotation.x, (mouse.y * 0.1), 0.1);
-            // FIXED: Set center to 0 for floating
-            panelGroup.position.y = 0 + Math.sin(timeNow * 1.5) * 0.15;
-            raycaster.setFromCamera(mouse, camera);
-            const isHovered = raycaster.intersectObjects(panelGroup.children).length > 0;
-            document.body.style.cursor = isHovered ? 'pointer' : 'crosshair';
-            outerWire.material.color.setHex(isHovered ? 0xffffff : 0x00ff41);
-        }
-
-        for(let i=0; i<starObjects.length; i++) {
-            const s = starObjects[i];
-            let warpFactor = isWarping && !arrived ? Math.pow(Math.sin(warpProgress * Math.PI), 2) * 85 : 0;
-            let speed = s.userData.speed + warpFactor;
-            s.position.z += speed;
-            if (s.position.z > 50) {
-                resetStar(s);
-                if (isWarping) s.position.z = -4000;
-                if (isWarping && !arrived) {
-    camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 85);
-    camera.updateProjectionMatrix();
-} else if (arrived) {
-    // ADJUST THIS: Use 90 for mobile to create a "Wide Angle" zoom-out effect
-    const targetFOV = window.innerWidth < 768 ? 90 : 75;
-    camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, 0.1);
-    camera.updateProjectionMatrix();
-}
-            }
-        }
-
-        if (artifact.visible) {
-            artifact.rotation.y += 0.002;
-            artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 0.4, 0.05);
-            artifact.rotation.y += mouse.x * 0.01;
-        }
-    }
-
-    renderer.render(scene, camera);
-}
-
-       function onResize() {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-
-    camera.aspect = width / height;
-    
-    // If screen is narrow (portrait), increase FOV to "zoom out"
-    if (width < height) {
-        camera.fov = 85; 
-    } else {
-        camera.fov = 75;
-    }
-    
-    camera.updateProjectionMatrix();
-    renderer.setSize(width, height);
-    generateGrid();
-}
 
         init();
     </script>
