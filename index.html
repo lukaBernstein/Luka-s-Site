@@ -343,7 +343,7 @@
             
             setTimeout(() => {
                 container.classList.add('crawl-active');
-                setTimeout(() => { revealPanel(); }, 20000);
+                setTimeout(() => { revealPanel(); }, 25000);
             }, 3200); 
         }
 
@@ -506,6 +506,7 @@
             const boxGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(24, 8));
             buttonBox = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({ color: 0xffd966, transparent: true, opacity: 0 }));
             buttonBox.position.set(0, 0.2, 0.5); nebula.add(buttonBox);
+            buttonBox.visible = false; // Add this line to hide the box
             const configs = [{c:0xff007b, r:14, t:'h', s:0.008}, {c:0x7000ff, r:18, t:'h', s:0.006}, {c:0xffd700, r:16, t:'h', s:0.007}, {c:0x00ffff, r:15, t:'v', s:0.009}];
             configs.forEach((cfg, i) => {
                 const orb = new THREE.Group();
@@ -594,7 +595,7 @@
                     isSpelling = true;
                     artifact.children.forEach(c => { if(c.isMesh && c.material) gsap.to(c.material, { opacity: 0.05, duration: 2 }); });
                     gsap.to(nebula.material, { opacity: 1, duration: 1 });
-                    gsap.to(buttonBox.material, { opacity: 0.6, duration: 1.5, delay: 0.5 });
+                    //gsap.to(buttonBox.material, { opacity: 0.6, duration: 1.5, delay: 0.5 });
                     return;
                 }
             }
