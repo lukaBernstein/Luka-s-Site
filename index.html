@@ -7,13 +7,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
-        /* Added Inter 900 for the tall bold button font */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@900&family=Pathway+Gothic+One&display=swap');
 
         body { margin: 0; background: #000; overflow: hidden; cursor: crosshair; }
         canvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: block; }
 
-        /* --- STAR WARS CRAWL STYLES --- */
         #crawl-container {
             display: none; 
             position: fixed;
@@ -76,18 +74,8 @@
             margin-bottom: 250px;
         }
 
-        .title p {
-            font-size: 1.8rem;
-            margin: 0 0 10px;
-            letter-spacing: 0.15em;
-        }
-
-        .title h1 {
-            font-size: 6.5rem;
-            margin: 0;
-            letter-spacing: 0.02em;
-            transform: scaleY(1.35);
-        }
+        .title p { font-size: 1.8rem; margin: 0 0 10px; letter-spacing: 0.15em; }
+        .title h1 { font-size: 6.5rem; margin: 0; letter-spacing: 0.02em; transform: scaleY(1.35); }
 
         @keyframes scroll-up {
             0% { top: 225vh; }
@@ -106,13 +94,9 @@
                         <p>Episode VII</p>
                         <h1>LUKA BERNSTEIN</h1>
                     </div>
-                    
                     <p>It is a period of digital innovation. A lone engineer has constructed a mysterious polyhedron to house the secrets of his technical prowess.</p>
-
                     <p>Armed with React, Node.js, and the power of Three.js, he crafts immersive experiences that bridge the gap between imagination and reality.</p>
-
                     <p>Having successfully transmitted the resume to the recruiter's fleet, Bernstein now prepares for the next great challenge in the tech galaxy...</p>
-
                     <br><br>
                     <p style="text-align: center;">FULL STACK ENGINEER<br>CREATIVE TECHNOLOGIST<br>2026</p>
                 </div>
@@ -125,7 +109,6 @@
         let artifact, nebula, buttonBox, isWarping = false, arrived = false, isUnfolded = false, isSpelling = false, isCredits = false, isPanning = false;
         let warpProgress = 0, mainGroup;
 
-        // Variables for the final button panel
         let panelGroup, outerWire, innerWire, panelTextMesh, panelReady = false;
         
         const _v3 = new THREE.Vector3();
@@ -235,11 +218,13 @@
             return group;
         }
 
+        // IMPROVED: Reset logic creates a tunnel deeper than the camera view
         function resetStar(star, initial = false) {
-            const radius = Math.random() * 600 + 100;
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos(2 * Math.random() - 1);
-            star.position.set(radius * Math.sin(phi) * Math.cos(theta), radius * Math.sin(phi) * Math.sin(theta), initial ? (Math.random() * -1500) : -1200);
+            const radiusX = (Math.random() - 0.5) * 600;
+            const radiusY = (Math.random() - 0.5) * 600;
+            // Spawn them significantly further back to avoid empty space
+            const zPos = initial ? (Math.random() * -4000) : -3000;
+            star.position.set(radiusX, radiusY, zPos);
         }
 
         function downloadResume() {
@@ -254,31 +239,23 @@
             gsap.to(buttonBox.material, { opacity: 0, duration: 1.5 });
         }
 
-        // Logic for creating the final button mesh
         function createPanelButton() {
             panelGroup = new THREE.Group();
             panelGroup.visible = false;
-
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.width = 2048; canvas.height = 512;
-
             const panelWidth = 40; const panelHeight = 5.2;
-
             const outerGeo = new THREE.BoxGeometry(panelWidth, panelHeight, 0.5);
             outerWire = new THREE.LineSegments(new THREE.EdgesGeometry(outerGeo), new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0 }));
-            
             const innerGeo = new THREE.BoxGeometry(panelWidth - 0.8, panelHeight - 0.8, 0.2);
             innerWire = new THREE.LineSegments(new THREE.EdgesGeometry(innerGeo), new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0 }));
-
             const glassMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 });
             const glassPanel = new THREE.Mesh(new THREE.PlaneGeometry(panelWidth, panelHeight), glassMat);
-
             const faceMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
             panelTextMesh = new THREE.Mesh(new THREE.PlaneGeometry(panelWidth - 1, panelHeight - 1), faceMat);
             panelTextMesh.position.z = 0.3;
-            panelTextMesh.scale.y = 1.3; // Make font look taller
-
+            panelTextMesh.scale.y = 1.3;
             document.fonts.load('900 74px Inter').then(() => {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#00ff41';
@@ -289,12 +266,10 @@
                 faceMat.map = new THREE.CanvasTexture(canvas);
                 faceMat.needsUpdate = true;
             });
-
             panelGroup.add(outerWire, innerWire, glassPanel, panelTextMesh);
             camera.add(panelGroup);
             panelGroup.position.set(0, -6, -25);
             panelGroup.rotation.x = -0.15;
-            
             return panelGroup;
         }
 
@@ -310,21 +285,14 @@
         function rollCreditsSequence() {
             if (isPanning) return;
             isPanning = true;
-            
-            // Pan camera away
             gsap.to(camera.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
             gsap.to(camera.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
-            
-            // Drop current content
             gsap.to(mainGroup.position, { y: -500, z: -500, duration: 3, ease: "power3.in" });
             gsap.to(tileGroup.position, { y: -500, duration: 3, ease: "power3.in" });
-
-            // Start the Star Wars Credits
             setTimeout(() => {
                 const container = document.getElementById('crawl-container');
                 container.style.display = 'block';
                 container.classList.add('crawl-active');
-                // Trigger panel reveal 18 seconds into the credits
                 setTimeout(() => { revealPanel(); }, 18000);
             }, 2000); 
         }
@@ -333,7 +301,8 @@
             clock = new THREE.Clock();
             scene = new THREE.Scene();
             mainGroup = new THREE.Group(); scene.add(mainGroup);
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+            // FIXED: Far plane increased to 5000 to prevent clipping during high FOV
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
             camera.position.z = 10;
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -347,6 +316,8 @@
                 const star = new THREE.Mesh(starGeo, starMat);
                 resetStar(star, true);
                 star.userData = { speed: Math.random() * 0.2 + 0.1 };
+                // FIXED: Disable frustum culling so long star-tails don't disappear
+                star.frustumCulled = false; 
                 starObjects.push(star); mainGroup.add(star);
             }
 
@@ -359,26 +330,21 @@
             namePlane = new THREE.Mesh(new THREE.PlaneGeometry(35, 10), nameMat);
             namePlane.position.z = 200; 
             scene.add(namePlane);
-
             glowPlane = createAuraMesh();
             glowPlane.position.z = 200;
             glowPlane.material.opacity = 0;
             scene.add(glowPlane);
-            
             nameLight = new THREE.PointLight(0xffcc00, 0, 60); 
             nameLight.position.set(0, 0, -4.5); scene.add(nameLight);
             sweepLight = new THREE.PointLight(0xffffff, 0, 45);
             sweepLight.position.set(-20, 10, -5); scene.add(sweepLight);
-
             artifact = createObsidianPolyhedron();
             nebula = createNebula(); artifact.add(nebula);
             artifact.position.z = -1500; artifact.visible = false;
             mainGroup.add(artifact);
-
             const boxGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(24, 8));
             buttonBox = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({ color: 0xffd966, transparent: true, opacity: 0 }));
             buttonBox.position.set(0, 0.2, 0.5); nebula.add(buttonBox);
-
             const configs = [{c:0xff007b, r:14, t:'h', s:0.008}, {c:0x7000ff, r:18, t:'h', s:0.006}, {c:0xffd700, r:16, t:'h', s:0.007}, {c:0x00ffff, r:15, t:'v', s:0.009}];
             configs.forEach((cfg, i) => {
                 const orb = new THREE.Group();
@@ -387,24 +353,18 @@
                 orb.data = { a: i * 2, r: cfg.r, type: cfg.t, speed: cfg.s }; 
                 orbs.push(orb); mainGroup.add(orb);
             });
-
             generateGrid(); 
             scene.add(tileGroup);
             scene.add(new THREE.AmbientLight(0xffffff, 0.45)); 
-
-            // Add the panel but keep it hidden
             createPanelButton();
             scene.add(camera);
-
             renderer.compile(scene, camera);
-
             gsap.to(namePlane.position, { z: -8, duration: 1.8, ease: "power4.out" });
             gsap.to(namePlane.material, { opacity: 1, duration: 1.2, delay: 0.2 });
             gsap.to(glowPlane.position, { z: -8.2, duration: 1.8, ease: "power4.out" });
             gsap.to(glowPlane.material, { opacity: 0.42, duration: 1.2, delay: 0.4 });
             gsap.to(nameLight, { intensity: 280, duration: 2, delay: 0.5 });
             gsap.to(sweepLight, { intensity: 880, duration: 2, delay: 0.6 });
-
             tiles.forEach(t => {
                 const finalZ = t.position.z;
                 t.position.z = 300 + (Math.random() * 200);
@@ -412,7 +372,6 @@
                 gsap.to(t.position, { z: finalZ, duration: 2.2 + Math.random(), ease: "power3.out", delay: Math.random() * 0.5 });
                 gsap.to(t.material, { opacity: 0.4, duration: 1.5, delay: 0.8 + Math.random() * 0.5 });
             });
-
             window.addEventListener('mousemove', (e) => { mouse.x = (e.clientX/window.innerWidth)*2-1; mouse.y = -(e.clientY/window.innerHeight)*2+1; });
             window.addEventListener('click', onClick);
             window.addEventListener('resize', onResize);
@@ -443,8 +402,6 @@
 
         function onClick() {
             raycaster.setFromCamera(mouse, camera);
-
-            // Click handling for the restart panel
             if (panelReady) {
                 const panelHit = raycaster.intersectObjects(panelGroup.children);
                 if (panelHit.length > 0) {
@@ -453,14 +410,9 @@
                     return;
                 }
             }
-
             if (isSpelling) {
                 if (raycaster.intersectObjects([nebula, buttonBox], true).length > 0) {
-                    if (!isCredits) {
-                        downloadResume();
-                    } else {
-                        rollCreditsSequence();
-                    }
+                    if (!isCredits) { downloadResume(); } else { rollCreditsSequence(); }
                     return;
                 }
             }
@@ -492,7 +444,6 @@
                 gsap.to([namePlane.scale, glowPlane.scale], { x: 5, y: 5, duration: 2.5, ease: "power2.in" });
                 gsap.to([namePlane.material, glowPlane.material], { opacity: 0, duration: 1.8, delay: 0.5 });
                 gsap.to([nameLight, sweepLight], { intensity: 0, duration: 1.2 });
-                
                 tiles.forEach(t => {
                     const delay = Math.random() * 0.4;
                     const flyX = (t.position.x * 20);
@@ -502,7 +453,6 @@
                     gsap.to(t.rotation, { x: Math.random() * 12, y: Math.random() * 12, duration: 2.4, delay: delay });
                     gsap.to(t.material, { opacity: 0, duration: 1.2, delay: delay + 1.2 });
                 });
-
                 gsap.to(window, { duration: 4.0, onUpdate: function() { warpProgress = this.progress(); }, onComplete: () => arrived = true });
                 starObjects.forEach(s => {
                     gsap.to(s.scale, { z: 150, duration: 1.0 });
@@ -582,13 +532,11 @@
                 posAttr.needsUpdate = true; colAttr.needsUpdate = true;
                 nebula.rotation.set(-artifact.rotation.x, -artifact.rotation.y, -artifact.rotation.z);
                 if (!isCredits) buttonBox.material.opacity = 0.4 + Math.sin(timeNow * 2) * 0.2;
-                
                 raycaster.setFromCamera(mouse, camera);
                 const hover = raycaster.intersectObjects([nebula, buttonBox], true);
                 document.body.style.cursor = (hover.length > 0) ? 'pointer' : 'crosshair';
             }
 
-            // Animate final panel floating and hover states
             if (panelGroup && panelGroup.visible) {
                 panelGroup.rotation.y = THREE.MathUtils.lerp(panelGroup.rotation.y, mouse.x * 0.2, 0.1);
                 panelGroup.rotation.x = THREE.MathUtils.lerp(panelGroup.rotation.x, -0.15 + (mouse.y * 0.1), 0.1);
@@ -599,12 +547,19 @@
                 outerWire.material.color.setHex(isHovered ? 0xffffff : 0x00ff41);
             }
 
+            // FIXED: Star Loop logic to prevent gaps during warp
             for(let i=0; i<starObjects.length; i++) {
                 const s = starObjects[i];
-                let speed = s.userData.speed + (isWarping && !arrived ? Math.pow(Math.sin(warpProgress * Math.PI), 2) * 60 : 0);
+                let warpFactor = isWarping && !arrived ? Math.pow(Math.sin(warpProgress * Math.PI), 2) * 85 : 0;
+                let speed = s.userData.speed + warpFactor;
                 s.position.z += speed;
-                if (s.position.z > 20 && !isWarping) resetStar(s);
-                else if (s.position.z > 800) resetStar(s);
+
+                // Reset threshold is now behind the camera (z > 50)
+                if (s.position.z > 50) {
+                    resetStar(s);
+                    // Push them further back during warp to create a deeper star pool
+                    if (isWarping) s.position.z = -4000;
+                }
             }
 
             if (artifact.visible) {
