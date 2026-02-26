@@ -373,7 +373,17 @@
             const posArray = new Float32Array(40000 * 3);
             for (let i = 0; i < 40000 * 3; i++) posArray[i] = (Math.random() - 0.5) * 3500;
             starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-            terrainStars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2.8, transparent: true, sizeAttenuation: false }));
+            
+            // FIX: Prevent stars from showing through terrain by disabling depthWrite and setting renderOrder
+            terrainStars = new THREE.Points(starGeo, new THREE.PointsMaterial({ 
+                color: 0xffffff, 
+                size: 2.8, 
+                transparent: true, 
+                sizeAttenuation: false,
+                depthWrite: false 
+            }));
+            terrainStars.renderOrder = -1; // Force background rendering
+            
             scene.add(terrainStars);
 
             scene.add(new THREE.HemisphereLight(0x443366, 0x330000, 1.5));
