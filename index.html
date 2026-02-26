@@ -91,104 +91,80 @@
             0% { top: 250vh; }
             100% { top: -15000px; }
         }
-/* MOBILE FIXES */
-@media screen and (max-width: 768px) {
-    .star-wars-stage { 
-        perspective: 3000px; 
-        perspective-origin: 50% 100%;
-        overflow: visible; 
-    }
 
-    .crawl-plane { 
-        width: 100%; 
-        transform: rotateX(70deg) translateZ(-500px); 
-        transform-origin: 50% 0%;
-        z-index: 150;
-    }
+        /* MOBILE FIXES */
+        @media screen and (max-width: 768px) {
+            .star-wars-stage { 
+                perspective: 3000px; 
+                perspective-origin: 50% 100%;
+                overflow: visible; 
+            }
 
-    .crawl-content { 
-        /* 1. INCREASED FONT SIZE (from 1.1rem to 1.4rem) */
-        font-size: 1.4rem; 
-        
-        /* 2. ADJUSTED WIDTH to keep the bigger text in the safe zone */
-        width: 85%; 
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%); 
-        
-        /* 3. REDUCED START DISTANCE (from 200vh to 125vh for a faster start) */
-        top: 100vh; 
-        
-        line-height: 1.5; 
-        font-weight: 900;
-        text-align: justify;
-        text-justify: inter-word;
-        letter-spacing: 0.05em; 
-        -webkit-font-smoothing: antialiased;
-        text-shadow: 0 0 3px rgba(254, 218, 74, 0.8); 
-        backface-visibility: hidden;
-    }
-    .start-button { 
-    /* Scaling the font down */
-    font-size: 0.9rem; 
-    
-    /* Reducing padding to shrink the "box" of the button */
-    padding: 10px 20px; 
-    
-    /* Optional: set a max-width so it doesn't span the whole screen */
-    width: auto;
-    max-width: 80%;
-    
-    /* Ensure it stays centered */
-    margin: 0 auto;
-    display: block;
+            .crawl-plane { 
+                width: 100%; 
+                transform: rotateX(70deg) translateZ(-500px); 
+                transform-origin: 50% 0%;
+                z-index: 150;
+            }
 
-    /* Slightly smaller shadow/glow to match the new size */
-    box-shadow: 0 0 10px rgba(254, 218, 74, 0.5);
-}
+            .crawl-content { 
+                font-size: 1.4rem; 
+                width: 85%; 
+                position: absolute;
+                left: 50%;
+                transform: translateX(-50%); 
+                top: 100vh; 
+                line-height: 1.5; 
+                font-weight: 900;
+                text-align: justify;
+                text-justify: inter-word;
+                letter-spacing: 0.05em; 
+                -webkit-font-smoothing: antialiased;
+                text-shadow: 0 0 3px rgba(254, 218, 74, 0.8); 
+                backface-visibility: hidden;
+            }
 
-    .title h1 { 
-        font-size: 2.8rem; /* Scaled up title to match bigger body text */
-        text-align: center;
-        width: 100%;
-        margin-bottom: 60px;
-        transform: scaleY(1.4);
-    }
+            .start-button { 
+                font-size: 0.9rem; 
+                padding: 10px 20px; 
+                width: auto;
+                max-width: 80%;
+                margin: 0 auto;
+                display: block;
+                box-shadow: 0 0 10px rgba(254, 218, 74, 0.5);
+            }
 
-    .crawl-active .crawl-content {
-        /* You can reduce the 140s to 120s if you want the whole scroll to be faster too */
-        animation: scroll-up-mobile 140s linear forwards;
-    }
+            .title h1 { 
+                font-size: 2.8rem; 
+                text-align: center;
+                width: 100%;
+                margin-bottom: 60px;
+                transform: scaleY(1.4);
+            }
 
-    @keyframes scroll-up-mobile {
-        0% { 
-            /* MATCH the 125vh from above */
-            top: 125vh; 
-            transform: translateX(-50%) scale(1); 
+            .crawl-active .crawl-content {
+                animation: scroll-up-mobile 140s linear forwards;
+            }
+
+            @keyframes scroll-up-mobile {
+                0% { 
+                    top: 125vh; 
+                    transform: translateX(-50%) scale(1); 
+                }
+                100% { 
+                    top: -15000px; 
+                    transform: translateX(-50%) scale(0.4); 
+                }
+            }
+
+            button#start-button, .start-button, button { 
+                font-size: 0.85rem !important; 
+                padding: 8px 16px !important; 
+                min-width: 150px !important;
+                bottom: 10% !important; 
+            }
         }
-        100% { 
-            top: -15000px; 
-            transform: translateX(-50%) scale(0.4); 
-        }
-    }
-    button#start-button, 
-.start-button,
-button { 
-    /* Reduce font size by 25% (assuming desktop was ~1.2rem) */
-    font-size: 0.85rem !important; 
-    
-    /* Shrink the button's footprint */
-    padding: 8px 16px !important; 
-    
-    /* Ensure it doesn't stretch too wide */
-    min-width: 150px !important;
-    
-    /* Adjust positioning if it feels too cramped */
-    bottom: 10% !important; 
-}
-}
-</style>
-</style>
+    </style>
 </head>
 <body>
 
@@ -393,19 +369,13 @@ button {
         }
 
         function revealPanel() {
-    panelGroup.visible = true;
-    panelReady = true;
-    gsap.to(panelGroup.position, { z: -20, duration: 2, ease: "expo.out" });
-    
-    // REMOVE OR COMMENT OUT THIS LINE BELOW:
-    // gsap.to(outerWire.material, { opacity: 1, duration: 0.1, repeat: 5, yoyo: true }); 
-    
-    // ADD THIS LINE INSTEAD to simply fade the border in with the text:
-    gsap.to(outerWire.material, { opacity: 1, duration: 1.5, delay: 0.5 });
-
-    gsap.to(panelTextMesh.material, { opacity: 1, duration: 1.5, delay: 0.5 });
-    gsap.to(innerWire.material, { opacity: 0.5, duration: 1.5, delay: 0.8 });
-}
+            panelGroup.visible = true;
+            panelReady = true;
+            gsap.to(panelGroup.position, { z: -20, duration: 2, ease: "expo.out" });
+            gsap.to(outerWire.material, { opacity: 1, duration: 1.5, delay: 0.5 });
+            gsap.to(panelTextMesh.material, { opacity: 1, duration: 1.5, delay: 0.5 });
+            gsap.to(innerWire.material, { opacity: 0.5, duration: 1.5, delay: 0.8 });
+        }
 
         function rollCreditsSequence() {
             if (isPanning) return;
@@ -450,7 +420,6 @@ button {
             scene.background = new THREE.Color(VOID_PURPLE);
             scene.fog = new THREE.FogExp2(VOID_PURPLE, 0.1); 
             
-            // Adjust camera for mobile in terrain mode
             const height = isMobile() ? 35 : 21.8;
             camera.position.set(0, height, 0);
             camera.rotation.set(-0.10, 0, 0);
@@ -458,8 +427,9 @@ button {
             camera.updateProjectionMatrix();
 
             const starGeo = new THREE.BufferGeometry();
-            const posArray = new Float32Array(40000 * 3);
-            for (let i = 0; i < 40000 * 3; i++) posArray[i] = (Math.random() - 0.5) * 3500;
+            const starCount = 150000;
+            const posArray = new Float32Array(starCount * 3);
+            for (let i = 0; i < starCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 3500;
             starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
             terrainStars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2.8, transparent: true, sizeAttenuation: false, depthWrite: false }));
             terrainStars.renderOrder = -1; 
@@ -528,9 +498,11 @@ button {
             renderer.toneMapping = THREE.ReinhardToneMapping; 
             document.body.appendChild(renderer.domElement);
 
-            const starGeo = new THREE.SphereGeometry(0.12, 6, 6);
+            const starCount = 12000;
             const starMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            for(let i=0; i<3000; i++) {
+            for(let i=0; i<starCount; i++) {
+                const starSize = 0.08 + Math.random() * 0.08;
+                const starGeo = new THREE.SphereGeometry(starSize, 4, 4);
                 const star = new THREE.Mesh(starGeo, starMat);
                 resetStar(star, true);
                 star.userData = { speed: Math.random() * 0.2 + 0.1 };
@@ -652,7 +624,7 @@ button {
                 starObjects.forEach(s => { gsap.to(s.scale, { z: 150, duration: 1.0 }); gsap.to(s.scale, { z: 1, duration: 0.5, delay: 3.2 }); });
                 setTimeout(() => { 
                     artifact.visible = true; 
-                    const targetZ = isMobile() ? -25 : -15; // Move further back on mobile
+                    const targetZ = isMobile() ? -25 : -15; 
                     gsap.to(artifact.position, { z: targetZ, duration: 1.5, ease: "power3.out" }); 
                 }, 2800);
             }
@@ -670,6 +642,23 @@ button {
                 terrainStars.position.x = camera.position.x * 0.95; 
                 updateTerrainGrid();
             } else {
+                // HOVER DETECTION LOGIC
+                let isHovering = false;
+                raycaster.setFromCamera(mouse, camera);
+
+                if (panelReady) {
+                    if (raycaster.intersectObjects(panelGroup.children).length > 0) isHovering = true;
+                } else if (isSpelling) {
+                    if (raycaster.intersectObjects([nebula, buttonBox], true).length > 0) isHovering = true;
+                } else if (isUnfolded) {
+                    if (raycaster.intersectObjects(artifact.children, true).length > 0) isHovering = true;
+                } else if (arrived) {
+                    if (raycaster.intersectObjects(artifact.children, true).length > 0) isHovering = true;
+                } else if (!isWarping) {
+                    if (raycaster.intersectObject(namePlane).length > 0) isHovering = true;
+                }
+                document.body.style.cursor = isHovering ? 'pointer' : 'crosshair';
+
                 if (namePlane && !isWarping) {
                     const breath = 0.45 + ((Math.sin(timeNow * 2.2) + 1) / 2) * 0.40; 
                     sweepLight.position.set(Math.sin(timeNow * 1.2) * 28, -Math.sin(timeNow * 1.2) * 10, -5);
@@ -692,7 +681,6 @@ button {
                     });
                 }
 
-                // Handle FOV Transitions
                 if(isWarping && !arrived) {
                     camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 85);
                     camera.updateProjectionMatrix();
