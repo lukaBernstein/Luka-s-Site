@@ -94,7 +94,7 @@
 /* MOBILE FIXES */
 @media screen and (max-width: 768px) {
     .star-wars-stage { 
-        perspective: 4000px; 
+        perspective: 6000px; 
         perspective-origin: 50% 100%;
     }
 
@@ -109,11 +109,10 @@
     }
 
     .crawl-content { 
-        font-size: 1.1rem; 
-        /* Centering logic */
-        width: 100%; /* Changed to 100% to ensure title has full span to center itself */
-        position: absolute;
-        left: 0; 
+        font-size: 1.6rem; 
+        top: 150vh; /* Set the starting resting position here */
+        line-height: 1.2; 
+    }
         
         top: 105vh; 
         line-height: 1.6; 
@@ -156,7 +155,7 @@
 
     @keyframes scroll-up-mobile {
         0% { 
-            top: 250vh; 
+            top: 200vh; 
             transform: scale(1); 
         }
         100% { 
