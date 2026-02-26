@@ -21,6 +21,7 @@
 
         #crawl-container {
             display: none; 
+            opacity: 0; /* Added for smooth fade-in */
             position: fixed;
             top: 0;
             left: 0;
@@ -116,7 +117,7 @@
     <script>
         let scene, camera, renderer, clock, tiles = [], starObjects = [], orbs = [], namePlane, glowPlane, nameLight, sweepLight;
         let artifact, nebula, buttonBox, isWarping = false, arrived = false, isUnfolded = false, isSpelling = false, isCredits = false, isPanning = false;
-        let warpProgress = 0, mainGroup;
+        let warpProgress = 0, mainGroup, starGroup; // Added starGroup
 
         let panelGroup, outerWire, innerWire, panelTextMesh, panelReady = false;
         
@@ -185,8 +186,8 @@
 
         function createNebula() {
             const resumeTargets = getCoords('RESUME', 160, 0.035);
-            // CHANGED: "ROLL CREDITS" -> "CREDITS" and adjusted size to match RESUME
-            const creditsTargets = getCoords('CREDITS', 160, 0.035); 
+            // CHANGED: CREDITS -> MORE!
+            const creditsTargets = getCoords('MORE!', 160, 0.035); 
             const count = 9000; 
             const geo = new THREE.BufferGeometry();
             const pos = new Float32Array(count * 3);
@@ -300,13 +301,21 @@
         function rollCreditsSequence() {
             if (isPanning) return;
             isPanning = true;
+
+            const container = document.getElementById('crawl-container');
+            container.style.display = 'block';
+            
+            // FADE IN container to prevent pop-in of the fade gradient
+            gsap.to(container, { opacity: 1, duration: 4, ease: "power2.inOut" });
+
             gsap.to(camera.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
             gsap.to(camera.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
+            
+            // Pan only the polyhedron and orbs away, leave the starGroup alone
             gsap.to(mainGroup.position, { y: -500, z: -500, duration: 3, ease: "power3.in" });
             gsap.to(tileGroup.position, { y: -500, duration: 3, ease: "power3.in" });
+            
             setTimeout(() => {
-                const container = document.getElementById('crawl-container');
-                container.style.display = 'block';
                 container.classList.add('crawl-active');
                 setTimeout(() => { revealPanel(); }, 20000);
             }, 3200); 
@@ -327,6 +336,7 @@
                 onComplete: () => {
                     // Cleanup Scene 1
                     scene.remove(mainGroup);
+                    scene.remove(starGroup); // Added
                     scene.remove(tileGroup);
                     scene.remove(namePlane);
                     scene.remove(glowPlane);
@@ -417,6 +427,7 @@
             clock = new THREE.Clock();
             scene = new THREE.Scene();
             mainGroup = new THREE.Group(); scene.add(mainGroup);
+            starGroup = new THREE.Group(); scene.add(starGroup); // Added
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
             camera.position.z = 10;
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
@@ -432,7 +443,7 @@
                 resetStar(star, true);
                 star.userData = { speed: Math.random() * 0.2 + 0.1 };
                 star.frustumCulled = false; 
-                starObjects.push(star); mainGroup.add(star);
+                starObjects.push(star); starGroup.add(star); // Added to starGroup
             }
 
             const nameMat = new THREE.MeshStandardMaterial({ 
@@ -617,7 +628,6 @@
                 }
 
                 if(isWarping && !arrived) {
-                    // CHANGED: Increased the FOV multiplier from 60 to 85 for a more extreme warp
                     camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 85);
                     camera.updateProjectionMatrix();
                 } else if (arrived) {
@@ -644,7 +654,6 @@
                     const tarAttr = isCredits ? nebula.geometry.attributes.creditsTarget : nebula.geometry.attributes.target;
                     for (let i = 0; i < posAttr.count; i++) {
                         const i3 = i * 3;
-                        // CHANGED: lerp factor from 0.04 to 0.015 for slower assembly
                         posAttr.array[i3] = THREE.MathUtils.lerp(posAttr.array[i3], tarAttr.array[i3], 0.015);
                         posAttr.array[i3+1] = THREE.MathUtils.lerp(posAttr.array[i3+1], tarAttr.array[i3+1], 0.015);
                         posAttr.array[i3+2] = THREE.MathUtils.lerp(posAttr.array[i3+2], tarAttr.array[i3+2], 0.015);
