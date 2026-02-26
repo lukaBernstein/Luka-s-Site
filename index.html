@@ -99,7 +99,6 @@
     }
 
     .crawl-plane { 
-        /* Widened the plane to 100% to ensure no clipping */
         width: 100%; 
         transform: rotateX(45deg); 
         transform-origin: 50% 0%;
@@ -107,26 +106,34 @@
     }
 
     .crawl-content { 
-        font-size: 2rem; 
-        top: 110vh; 
-        line-height: 1.4; 
+        /* Reduced from 2.2rem to 1.1rem (50% smaller) */
+        font-size: 1.1rem; 
+        
+        /* Adjusted width to 95% to let text spread further to the edges */
+        width: 95%; 
+        margin: 0 auto;
+        
+        top: 105vh; 
+        line-height: 1.5; 
         font-weight: 900;
-        
-        /* ADDED THESE TWO LINES TO FIX THE EDGES: */
-        width: 90%;          /* Make the text slightly narrower than the plane */
-        margin: 0 auto;      /* Center the text within the plane */
-        
-        text-align: center;  /* Center alignment is safer for mobile edges than justify */
-        letter-spacing: 0.07em; 
+        text-align: center;
+        letter-spacing: 0.05em; 
+        -webkit-font-smoothing: antialiased;
         text-shadow: 0 0 2px rgba(254, 218, 74, 0.8); 
         backface-visibility: hidden;
     }
 
     .title h1 { 
-        font-size: 3.5rem; 
-        width: 100%;
-        text-align: center;
-        transform: scaleY(1.5); 
+        /* Scaled down the title to match the new proportions */
+        font-size: 2.2rem; 
+        font-weight: 900;
+        transform: scaleY(1.4); 
+        margin-bottom: 100px; /* Reduced margin for the smaller font */
+    }
+
+    .title p {
+        font-size: 1rem;
+        margin-bottom: 5px;
     }
 
     .crawl-active .crawl-content {
@@ -135,12 +142,13 @@
 
     @keyframes scroll-up-mobile {
         0% { 
-            top: 110vh; 
+            top: 105vh; 
+            /* Kept scale at 1.0 to prevent it from getting too large at the start */
             transform: scale(1); 
         }
         100% { 
-            top: -12000px; 
-            transform: scale(0.4); 
+            top: -15000px; 
+            transform: scale(0.5); 
         }
     }
 }
