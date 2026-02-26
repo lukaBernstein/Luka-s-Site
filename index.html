@@ -67,7 +67,7 @@
 
         .crawl-content {
             position: absolute;
-            top: 275vh; 
+            top: 200vh; 
             width: 100%;
             text-align: justify;
             text-justify: inter-word;
@@ -88,7 +88,7 @@
         .title h1 { font-size: 6.5rem; margin: 0; letter-spacing: 0.02em; transform: scaleY(1.35); }
 
         @keyframes scroll-up {
-            0% { top: 250vh; }
+            0% { top: 175vh; }
             100% { top: -15000px; }
         }
 
@@ -190,6 +190,7 @@
     </div>
 
     <script>
+        let isDownloading = false;
         let scene, camera, renderer, clock, tiles = [], starObjects = [], orbs = [], namePlane, glowPlane, nameLight, sweepLight;
         let artifact, nebula, buttonBox, isWarping = false, arrived = false, isUnfolded = false, isSpelling = false, isCredits = false, isPanning = false;
         let warpProgress = 0, mainGroup, starGroup; 
@@ -319,17 +320,32 @@
             star.position.set(radiusX, radiusY, zPos);
         }
 
-        function downloadResume() {
-            const link = document.createElement('a');
-            link.href = 'resume.pdf'; 
-            link.download = 'Luka_Bernstein_Resume.pdf';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            gsap.to(buttonBox.scale, { x: 1.1, y: 1.1, duration: 0.1, yoyo: true, repeat: 1 });
-            isCredits = true;
-            gsap.to(buttonBox.material, { opacity: 0, duration: 1.5 });
-        }
+       function downloadResume() {
+    // If we're already downloading or have already moved to credits, stop here.
+    if (isDownloading || isCredits) return; 
+    
+    isDownloading = true; 
+    isCredits = true; // Mark as credits immediately to flip the onClick logic
+
+    const link = document.createElement('a');
+    link.href = 'resume.pdf'; 
+    link.download = 'Luka_Bernstein_Resume.pdf';
+    
+    // Prevent this programmatic click from telling the window it was clicked
+    link.onclick = (e) => e.stopPropagation();
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Visual feedback on the "RESUME" text/box
+    gsap.to(buttonBox.scale, { x: 1.1, y: 1.1, duration: 0.1, yoyo: true, repeat: 1 });
+    
+    // Fade out the resume text and prepare for the "MORE!" text
+    gsap.to(buttonBox.material, { opacity: 0, duration: 1.5, onComplete: () => {
+        isDownloading = false; // Release the lock once the animation is done
+    }});
+}
 
         function createPanelButton() {
             panelGroup = new THREE.Group();
@@ -578,57 +594,76 @@
             }
         }
 
-        function onClick() {
-            raycaster.setFromCamera(mouse, camera);
-            if (panelReady) {
-                if (raycaster.intersectObjects(panelGroup.children).length > 0) { startTerrainTransition(); return; }
+function onClick(event) {
+    // Standardize the event to prevent issues on different browsers
+    if (event) event.preventDefault();
+
+    raycaster.setFromCamera(mouse, camera);
+
+    if (panelReady) {
+        if (raycaster.intersectObjects(panelGroup.children).length > 0) { startTerrainTransition(); return; }
+    }
+
+    if (isSpelling) {
+        if (raycaster.intersectObjects([nebula, buttonBox], true).length > 0) {
+            // Check the flag here: if it's the first time, download. If already clicked, roll credits.
+            if (!isCredits) {
+                downloadResume();
+            } else if (!isDownloading) {
+                // We only roll credits if we aren't currently in the middle of a download lock
+                rollCreditsSequence();
             }
-            if (isSpelling) {
-                if (raycaster.intersectObjects([nebula, buttonBox], true).length > 0) {
-                    if (!isCredits) downloadResume(); else rollCreditsSequence();
-                    return;
-                }
-            }
-            if (arrived && !isUnfolded) {
-                if (raycaster.intersectObjects(artifact.children, true).length > 0) {
-                    isUnfolded = true; gsap.to(nebula.material, { opacity: 0.35, duration: 2.5 });
-                    artifact.children.forEach(c => {
-                        if(c.userData.offsetDir) {
-                            _v3.copy(c.userData.offsetDir).multiplyScalar(14.5);
-                            gsap.to(c.position, { x: _v3.x, y: _v3.y * 1.2, z: _v3.z, duration: 3, ease: "power4.out" });
-                        }
-                    });
-                    return;
-                }
-            }
-            if (isUnfolded && !isSpelling) {
-                if (raycaster.intersectObjects(artifact.children, true).length > 0) {
-                    isSpelling = true; artifact.children.forEach(c => { if(c.isMesh && c.material) gsap.to(c.material, { opacity: 0.05, duration: 2 }); });
-                    gsap.to(nebula.material, { opacity: 1, duration: 1 }); return;
-                }
-            }
-            if (!isWarping && raycaster.intersectObject(namePlane).length > 0) {
-                isWarping = true;
-                gsap.to([namePlane.position, glowPlane.position], { z: 100, duration: 2.5, ease: "power2.in" });
-                gsap.to([namePlane.scale, glowPlane.scale], { x: 5, y: 5, duration: 2.5, ease: "power2.in" });
-                gsap.to([namePlane.material, glowPlane.material], { opacity: 0, duration: 1.8, delay: 0.5 });
-                gsap.to([nameLight, sweepLight], { intensity: 0, duration: 1.2 });
-                tiles.forEach(t => {
-                    const delay = Math.random() * 0.4;
-                    gsap.to(t.position, { x: t.position.x * 20, y: t.position.y * 20, z: 100, duration: 2.4, delay: delay, ease: "power2.in" });
-                    gsap.to(t.scale, { x: 3, y: 3, duration: 2.4, delay: delay });
-                    gsap.to(t.rotation, { x: Math.random() * 12, y: Math.random() * 12, duration: 2.4, delay: delay });
-                    gsap.to(t.material, { opacity: 0, duration: 1.2, delay: delay + 1.2 });
-                });
-                gsap.to(window, { duration: 4.0, onUpdate: function() { warpProgress = this.progress(); }, onComplete: () => arrived = true });
-                starObjects.forEach(s => { gsap.to(s.scale, { z: 150, duration: 1.0 }); gsap.to(s.scale, { z: 1, duration: 0.5, delay: 3.2 }); });
-                setTimeout(() => { 
-                    artifact.visible = true; 
-                    const targetZ = isMobile() ? -25 : -15; 
-                    gsap.to(artifact.position, { z: targetZ, duration: 1.5, ease: "power3.out" }); 
-                }, 2800);
-            }
+            return;
         }
+    }
+
+    if (arrived && !isUnfolded) {
+        if (raycaster.intersectObjects(artifact.children, true).length > 0) {
+            isUnfolded = true; 
+            gsap.to(nebula.material, { opacity: 0.35, duration: 2.5 });
+            artifact.children.forEach(c => {
+                if(c.userData.offsetDir) {
+                    _v3.copy(c.userData.offsetDir).multiplyScalar(14.5);
+                    gsap.to(c.position, { x: _v3.x, y: _v3.y * 1.2, z: _v3.z, duration: 3, ease: "power4.out" });
+                }
+            });
+            return;
+        }
+    }
+
+    if (isUnfolded && !isSpelling) {
+        if (raycaster.intersectObjects(artifact.children, true).length > 0) {
+            isSpelling = true; 
+            artifact.children.forEach(c => { 
+                if(c.isMesh && c.material) gsap.to(c.material, { opacity: 0.05, duration: 2 }); 
+            });
+            gsap.to(nebula.material, { opacity: 1, duration: 1 }); 
+            return;
+        }
+    }
+
+    if (!isWarping && raycaster.intersectObject(namePlane).length > 0) {
+        isWarping = true;
+        gsap.to([namePlane.position, glowPlane.position], { z: 100, duration: 2.5, ease: "power2.in" });
+        gsap.to([namePlane.scale, glowPlane.scale], { x: 5, y: 5, duration: 2.5, ease: "power2.in" });
+        gsap.to([namePlane.material, glowPlane.material], { opacity: 0, duration: 1.8, delay: 0.5 });
+        gsap.to([nameLight, sweepLight], { intensity: 0, duration: 1.2 });
+        tiles.forEach(t => {
+            const delay = Math.random() * 0.4;
+            gsap.to(t.position, { x: t.position.x * 20, y: t.position.y * 20, z: 100, duration: 2.4, delay: delay, ease: "power2.in" });
+            gsap.to(t.scale, { x: 3, y: 3, duration: 2.4, delay: delay });
+            gsap.to(t.rotation, { x: Math.random() * 12, y: Math.random() * 12, duration: 2.4, delay: delay });
+            gsap.to(t.material, { opacity: 0, duration: 1.2, delay: delay + 1.2 });
+        });
+        gsap.to(window, { duration: 4.0, onUpdate: function() { warpProgress = this.progress(); }, onComplete: () => arrived = true });
+        starObjects.forEach(s => { gsap.to(s.scale, { z: 150, duration: 1.0 }); gsap.to(s.scale, { z: 1, duration: 0.5, delay: 3.2 }); });
+        setTimeout(() => { 
+            artifact.visible = true; 
+            const targetZ = isMobile() ? -25 : -15; 
+            gsap.to(artifact.position, { z: targetZ, duration: 1.5, ease: "power3.out" }); 
+        }, 2800);
+    }
+}
 
         function animate() {
             requestAnimationFrame(animate);
