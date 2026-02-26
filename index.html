@@ -93,58 +93,52 @@
         }
 
     
-    /* ... (keep desktop styles exactly as they are) ... */
-/* MOBILE FIXES */
- /* MOBILE FIXES */
+  /* MOBILE FIXES */
 @media screen and (max-width: 768px) {
     .star-wars-stage { 
-        perspective: 1700px; 
+        /* Increased to 3000px to push the camera much further back */
+        perspective: 3000px; 
         perspective-origin: 50% 100%;
     }
 
     .crawl-plane { 
         width: 95%; 
-        transform: rotateX(25deg); 
+        /* Steeper angle (45deg) works better when the camera is further away */
+        transform: rotateX(45deg); 
         transform-origin: 50% 0%;
         z-index: 150;
     }
 
     .crawl-content { 
-        /* Slightly larger font to combat the "skinny" look */
-        font-size: 1.8rem; 
+        font-size: 2.2rem; /* Increased size because the distant camera makes text look smaller */
         top: 100vh; 
-        line-height: 1.3; 
-        
-        /* FIX FOR SKINNY FONT: */
-        font-weight: 900; /* Force maximum thickness */
-        letter-spacing: 0.05em; /* Add a tiny bit of breathing room */
-        -webkit-font-smoothing: antialiased; /* Ensure smoother rendering */
-        
-        /* This creates a "faux-bold" effect and adds back the Star Wars glow */
+        line-height: 1.4; 
+        font-weight: 900;
+        letter-spacing: 0.07em; 
+        -webkit-font-smoothing: antialiased;
         text-shadow: 0 0 2px rgba(254, 218, 74, 0.8); 
-        
         backface-visibility: hidden;
     }
 
     .title h1 { 
-        font-size: 3.2rem; 
-        /* Ensure the title also stays thick */
+        font-size: 3.8rem; 
         font-weight: 900;
-        transform: scaleY(1.35); /* Match the desktop vertical stretch */
+        transform: scaleY(1.5); 
     }
 
     .crawl-active .crawl-content {
-        animation: scroll-up-mobile 120s linear forwards;
+        animation: scroll-up-mobile 140s linear forwards;
     }
 
     @keyframes scroll-up-mobile {
         0% { 
-            top: 200vh; 
-            transform: scale(1.1); 
+            /* Start at 110vh so it's just below the camera lens at this distance */
+            top: 110vh; 
+            transform: scale(1); 
         }
         100% { 
-            top: -8000px; 
-            transform: scale(0.6); 
+            top: -12000px; 
+            transform: scale(0.4); 
         }
     }
 }
