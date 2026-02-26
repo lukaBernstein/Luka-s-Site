@@ -94,51 +94,62 @@
 /* MOBILE FIXES */
 @media screen and (max-width: 768px) {
     .star-wars-stage { 
-        perspective: 4000px; 
+        perspective: 3000px; 
         perspective-origin: 50% 100%;
+        overflow: visible; /* Ensures 3D effects aren't cropped by the container */
     }
 
     .crawl-plane { 
-        width: 100%; /* Keep this at 100% so we have room to breathe */
-        /* FIXED: Removed the semicolon after rotateX to keep the transform valid */
-        transform: rotateX(70deg) translateZ(-1500px); 
+        width: 100%; 
+        /* Reduced translateZ to -500px so it stays visible */
+        transform: rotateX(70deg) translateZ(-500px); 
         transform-origin: 50% 0%;
         z-index: 150;
-        box-sizing: border-box;
     }
 
     .crawl-content { 
         font-size: 1.1rem; 
-        width: 75%; 
+        width: 80%; /* Slightly wider for better readability */
         position: absolute;
         
-        /* FIXED: Set to 50% to allow the translateX(-50%) to center it */
+        /* The Centering Duo */
         left: 50%;
         transform: translateX(-50%); 
         
-        top: 275vh; 
+        top: 200vh; /* Brought the spawn point up slightly to see it sooner */
         line-height: 1.6; 
         font-weight: 900;
         text-align: justify;
         text-justify: inter-word;
+        
         letter-spacing: 0.05em; 
         -webkit-font-smoothing: antialiased;
         text-shadow: 0 0 2px rgba(254, 218, 74, 0.8); 
         backface-visibility: hidden;
     }
 
-    /* ... keep your title styles ... */
+    /* Keep Title exactly like this for perfect centering */
+    .title h1 { 
+        font-size: 2.2rem; 
+        text-align: center;
+        width: 100%;
+        margin: 0 auto 50px auto;
+        transform: scaleY(1.4);
+    }
+
+    .crawl-active .crawl-content {
+        animation: scroll-up-mobile 140s linear forwards;
+    }
 
     @keyframes scroll-up-mobile {
         0% { 
-            top: 275vh; 
-            /* FIXED: Combined center and scale (standardized to -50%) */
+            top: 200vh; 
+            /* Must match the translateX above to keep it centered */
             transform: translateX(-50%) scale(1); 
         }
         100% { 
             top: -15000px; 
-            /* FIXED: Kept translateX(-50%) here so it stays centered while moving */
-            transform: translateX(-50%) scale(0.5); 
+            transform: translateX(-50%) scale(0.4); 
         }
     }
 }
