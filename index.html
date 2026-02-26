@@ -7,14 +7,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Pathway+Gothic+One&display=swap');
+        /* Added Inter 900 for the tall bold button font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@900&family=Pathway+Gothic+One&display=swap');
 
         body { margin: 0; background: #000; overflow: hidden; cursor: crosshair; }
         canvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: block; }
 
         /* --- STAR WARS CRAWL STYLES --- */
         #crawl-container {
-            display: none; /* Hidden until rollCreditsSequence is called */
+            display: none; 
             position: fixed;
             top: 0;
             left: 0;
@@ -123,6 +124,9 @@
         let scene, camera, renderer, clock, tiles = [], starObjects = [], orbs = [], namePlane, glowPlane, nameLight, sweepLight;
         let artifact, nebula, buttonBox, isWarping = false, arrived = false, isUnfolded = false, isSpelling = false, isCredits = false, isPanning = false;
         let warpProgress = 0, mainGroup;
+
+        // Variables for the final button panel
+        let panelGroup, outerWire, innerWire, panelTextMesh, panelReady = false;
         
         const _v3 = new THREE.Vector3();
         const mouse = new THREE.Vector2(-10, -10); 
@@ -250,6 +254,59 @@
             gsap.to(buttonBox.material, { opacity: 0, duration: 1.5 });
         }
 
+        // Logic for creating the final button mesh
+        function createPanelButton() {
+            panelGroup = new THREE.Group();
+            panelGroup.visible = false;
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 2048; canvas.height = 512;
+
+            const panelWidth = 40; const panelHeight = 5.2;
+
+            const outerGeo = new THREE.BoxGeometry(panelWidth, panelHeight, 0.5);
+            outerWire = new THREE.LineSegments(new THREE.EdgesGeometry(outerGeo), new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0 }));
+            
+            const innerGeo = new THREE.BoxGeometry(panelWidth - 0.8, panelHeight - 0.8, 0.2);
+            innerWire = new THREE.LineSegments(new THREE.EdgesGeometry(innerGeo), new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0 }));
+
+            const glassMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 });
+            const glassPanel = new THREE.Mesh(new THREE.PlaneGeometry(panelWidth, panelHeight), glassMat);
+
+            const faceMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
+            panelTextMesh = new THREE.Mesh(new THREE.PlaneGeometry(panelWidth - 1, panelHeight - 1), faceMat);
+            panelTextMesh.position.z = 0.3;
+            panelTextMesh.scale.y = 1.3; // Make font look taller
+
+            document.fonts.load('900 74px Inter').then(() => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#00ff41';
+                ctx.font = '900 74px Inter, sans-serif'; 
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.shadowColor = '#00ff41'; ctx.shadowBlur = 10;
+                ctx.fillText('SHOW ME WHAT ELSE THIS GUY CAN DO!', 1024, 256);
+                faceMat.map = new THREE.CanvasTexture(canvas);
+                faceMat.needsUpdate = true;
+            });
+
+            panelGroup.add(outerWire, innerWire, glassPanel, panelTextMesh);
+            camera.add(panelGroup);
+            panelGroup.position.set(0, -6, -25);
+            panelGroup.rotation.x = -0.15;
+            
+            return panelGroup;
+        }
+
+        function revealPanel() {
+            panelGroup.visible = true;
+            panelReady = true;
+            gsap.to(panelGroup.position, { z: -20, duration: 2, ease: "expo.out" });
+            gsap.to(outerWire.material, { opacity: 1, duration: 0.1, repeat: 5, yoyo: true });
+            gsap.to(panelTextMesh.material, { opacity: 1, duration: 1.5, delay: 0.5 });
+            gsap.to(innerWire.material, { opacity: 0.5, duration: 1.5, delay: 0.8 });
+        }
+
         function rollCreditsSequence() {
             if (isPanning) return;
             isPanning = true;
@@ -267,7 +324,9 @@
                 const container = document.getElementById('crawl-container');
                 container.style.display = 'block';
                 container.classList.add('crawl-active');
-            }, 2000); // Slight delay to let the camera settle into the abyss
+                // Trigger panel reveal 18 seconds into the credits
+                setTimeout(() => { revealPanel(); }, 18000);
+            }, 2000); 
         }
 
         function init() {
@@ -332,6 +391,11 @@
             generateGrid(); 
             scene.add(tileGroup);
             scene.add(new THREE.AmbientLight(0xffffff, 0.45)); 
+
+            // Add the panel but keep it hidden
+            createPanelButton();
+            scene.add(camera);
+
             renderer.compile(scene, camera);
 
             gsap.to(namePlane.position, { z: -8, duration: 1.8, ease: "power4.out" });
@@ -379,6 +443,16 @@
 
         function onClick() {
             raycaster.setFromCamera(mouse, camera);
+
+            // Click handling for the restart panel
+            if (panelReady) {
+                const panelHit = raycaster.intersectObjects(panelGroup.children);
+                if (panelHit.length > 0) {
+                    gsap.to(panelGroup.position, { z: -22, duration: 0.1, yoyo: true, repeat: 1 });
+                    setTimeout(() => location.reload(), 300);
+                    return;
+                }
+            }
 
             if (isSpelling) {
                 if (raycaster.intersectObjects([nebula, buttonBox], true).length > 0) {
@@ -512,6 +586,17 @@
                 raycaster.setFromCamera(mouse, camera);
                 const hover = raycaster.intersectObjects([nebula, buttonBox], true);
                 document.body.style.cursor = (hover.length > 0) ? 'pointer' : 'crosshair';
+            }
+
+            // Animate final panel floating and hover states
+            if (panelGroup && panelGroup.visible) {
+                panelGroup.rotation.y = THREE.MathUtils.lerp(panelGroup.rotation.y, mouse.x * 0.2, 0.1);
+                panelGroup.rotation.x = THREE.MathUtils.lerp(panelGroup.rotation.x, -0.15 + (mouse.y * 0.1), 0.1);
+                panelGroup.position.y = -6 + Math.sin(timeNow * 1.5) * 0.15;
+                raycaster.setFromCamera(mouse, camera);
+                const isHovered = raycaster.intersectObjects(panelGroup.children).length > 0;
+                document.body.style.cursor = isHovered ? 'pointer' : 'crosshair';
+                outerWire.material.color.setHex(isHovered ? 0xffffff : 0x00ff41);
             }
 
             for(let i=0; i<starObjects.length; i++) {
