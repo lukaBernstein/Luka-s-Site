@@ -6,11 +6,18 @@
     <title>LUKA BERNSTEIN | RESUME ARTIFACT</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/simplex-noise@2.4.0/simplex-noise.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@900&family=Pathway+Gothic+One&display=swap');
 
         body { margin: 0; background: #000; overflow: hidden; cursor: crosshair; }
         canvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: block; }
+
+        /* ADDED: Transition Overlay */
+        #transition-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: black; z-index: 200; pointer-events: none; opacity: 0;
+        }
 
         #crawl-container {
             display: none; 
@@ -85,6 +92,8 @@
 </head>
 <body>
 
+    <div id="transition-overlay"></div>
+
     <div id="crawl-container">
         <div class="fade"></div>
         <div class="star-wars-stage">
@@ -116,6 +125,13 @@
         const raycaster = new THREE.Raycaster();
         const tileGroup = new THREE.Group();
         const sharedTileGeo = new THREE.SphereGeometry(0.35, 12, 12); 
+
+        // ADDED: Terrain Globals
+        let isTerrainMode = false;
+        const simplex = new SimplexNoise();
+        const terrainTiles = new Map();
+        const TILE_SIZE = 150, TILE_RES = 64, GRID_RADIUS = 2, VOID_PURPLE = 0x05020a;
+        let terrainStars;
 
         function getCoords(text, size, spacing) {
             const canvas = document.createElement('canvas');
@@ -218,11 +234,9 @@
             return group;
         }
 
-        // IMPROVED: Reset logic creates a tunnel deeper than the camera view
         function resetStar(star, initial = false) {
             const radiusX = (Math.random() - 0.5) * 600;
             const radiusY = (Math.random() - 0.5) * 600;
-            // Spawn them significantly further back to avoid empty space
             const zPos = initial ? (Math.random() * -4000) : -3000;
             star.position.set(radiusX, radiusY, zPos);
         }
@@ -297,11 +311,111 @@
             }, 2000); 
         }
 
+        // ADDED: Terrain Setup and Logic Functions
+        function startTerrainTransition() {
+            const overlay = document.getElementById('transition-overlay');
+            panelReady = false; 
+
+            // Fade Button and Screen to Black
+            gsap.to([outerWire.material, panelTextMesh.material], { opacity: 0, duration: 1.0 });
+            gsap.to(panelGroup.position, { z: -50, duration: 1.5, ease: "power2.in" });
+            
+            gsap.to(overlay, { 
+                opacity: 1, 
+                duration: 1.5, 
+                onComplete: () => {
+                    // Cleanup Scene 1
+                    scene.remove(mainGroup);
+                    scene.remove(tileGroup);
+                    scene.remove(namePlane);
+                    scene.remove(glowPlane);
+                    scene.remove(nameLight);
+                    scene.remove(sweepLight);
+                    camera.remove(panelGroup);
+                    document.getElementById('crawl-container').style.display = 'none';
+
+                    // Prepare Scene 2
+                    setupScene2();
+                    
+                    // Reveal Terrain
+                    gsap.to(overlay, { opacity: 0, duration: 2, delay: 0.5 });
+                    gsap.to(scene.fog, { density: 0.007, duration: 4, ease: "sine.inOut" });
+                }
+            });
+        }
+
+        function setupScene2() {
+            isTerrainMode = true;
+            scene.background = new THREE.Color(VOID_PURPLE);
+            scene.fog = new THREE.FogExp2(VOID_PURPLE, 0.1); 
+
+            camera.position.set(0, 21.8, 0);
+            camera.rotation.set(-0.10, 0, 0);
+            camera.fov = 85;
+            camera.updateProjectionMatrix();
+
+            const starGeo = new THREE.BufferGeometry();
+            const posArray = new Float32Array(40000 * 3);
+            for (let i = 0; i < 40000 * 3; i++) posArray[i] = (Math.random() - 0.5) * 3500;
+            starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            terrainStars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2.8, transparent: true, sizeAttenuation: false }));
+            scene.add(terrainStars);
+
+            scene.add(new THREE.HemisphereLight(0x443366, 0x330000, 1.5));
+            scene.add(new THREE.AmbientLight(0x442222, 0.3));
+            const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+            sun.position.set(50, 100, -100);
+            scene.add(sun);
+        }
+
+        function getTerrainHeight(worldX, worldZ) {
+            const s = 0.018;
+            let h = simplex.noise2D(worldX * s, worldZ * s) * 12; 
+            h += Math.abs(simplex.noise2D(worldX * s * 2.5, worldZ * s * 2.5)) * 8; 
+            return h;
+        }
+
+        function createTerrainTile(tx, tz) {
+            const geo = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE, TILE_RES, TILE_RES);
+            const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, metalness: 0.4, roughness: 0.5 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.rotation.x = -Math.PI / 2;
+            const ox = tx * TILE_SIZE, oz = tz * TILE_SIZE;
+            mesh.position.set(ox, 0, oz);
+            const pos = geo.attributes.position, colors = new Float32Array(pos.count * 3);
+            const c1 = new THREE.Color(0x2a0505), c2 = new THREE.Color(0x990000), c3 = new THREE.Color(0xff2200), c4 = new THREE.Color(0xffcccc);
+            for (let i = 0; i <= TILE_RES; i++) { for (let j = 0; j <= TILE_RES; j++) {
+                const idx = i * (TILE_RES + 1) + j;
+                const h = getTerrainHeight(ox + (j/TILE_RES-0.5)*TILE_SIZE, oz + (i/TILE_RES-0.5)*TILE_SIZE);
+                pos.setZ(idx, h);
+                let t = Math.max(0, Math.min(1, (h + 5) / 25));
+                const col = new THREE.Color();
+                if (t < 0.33) col.copy(c1).lerp(c2, t * 3); else if (t < 0.66) col.copy(c2).lerp(c3, (t-0.33)*3); else col.copy(c3).lerp(c4, (t-0.66)*3);
+                colors[idx*3] = col.r; colors[idx*3+1] = col.g; colors[idx*3+2] = col.b;
+            }}
+            geo.setAttribute('color', new THREE.BufferAttribute(colors, 3)); geo.computeVertexNormals();
+            scene.add(mesh); return mesh;
+        }
+
+        function updateTerrainGrid() {
+            const camTx = Math.round(camera.position.x / TILE_SIZE), camTz = Math.round(camera.position.z / TILE_SIZE);
+            for (let x = camTx - GRID_RADIUS; x <= camTx + GRID_RADIUS; x++) {
+                for (let z = camTz - GRID_RADIUS; z <= camTz + GRID_RADIUS; z++) {
+                    const key = `${x},${z}`; if (!terrainTiles.has(key)) terrainTiles.set(key, createTerrainTile(x, z));
+                }
+            }
+            for (const [key, tile] of terrainTiles) {
+                const [tx, tz] = key.split(',').map(Number);
+                if (Math.abs(tx - camTx) > GRID_RADIUS + 1 || Math.abs(tz - camTz) > GRID_RADIUS + 1) {
+                    scene.remove(tile); tile.geometry.dispose(); tile.material.dispose(); terrainTiles.delete(key);
+                }
+            }
+        }
+
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
             mainGroup = new THREE.Group(); scene.add(mainGroup);
-            // FIXED: Far plane increased to 5000 to prevent clipping during high FOV
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
             camera.position.z = 10;
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
@@ -316,7 +430,6 @@
                 const star = new THREE.Mesh(starGeo, starMat);
                 resetStar(star, true);
                 star.userData = { speed: Math.random() * 0.2 + 0.1 };
-                // FIXED: Disable frustum culling so long star-tails don't disappear
                 star.frustumCulled = false; 
                 starObjects.push(star); mainGroup.add(star);
             }
@@ -405,8 +518,8 @@
             if (panelReady) {
                 const panelHit = raycaster.intersectObjects(panelGroup.children);
                 if (panelHit.length > 0) {
-                    gsap.to(panelGroup.position, { z: -22, duration: 0.1, yoyo: true, repeat: 1 });
-                    setTimeout(() => location.reload(), 300);
+                    // CHANGED: Trigger Transition instead of reload
+                    startTerrainTransition();
                     return;
                 }
             }
@@ -469,103 +582,109 @@
             requestAnimationFrame(animate);
             const timeNow = clock.getElapsedTime();
 
-            if (namePlane && !isWarping) {
-                const pingPong = Math.sin(timeNow * 1.2); 
-                sweepLight.position.x = pingPong * 28; 
-                sweepLight.position.y = -pingPong * 10; 
-                const breath = 0.45 + ((Math.sin(timeNow * 2.2) + 1) / 2) * 0.40; 
-                glowPlane.material.opacity = 0.3 + (0.28 * breath); 
-                glowPlane.scale.set(1.08 + (breath * 0.07), 1.08 + (breath * 0.07), 1);
-                nameLight.intensity = (230 + (breath * 165)); 
-                namePlane.material.emissiveIntensity = 0.45 + (breath * 0.38);
-                const tx = mouse.x * 10, ty = mouse.y * 6;
-                for(let i=0; i<tiles.length; i++){
-                    const tile = tiles[i];
-                    if(Math.abs(tile.position.z) < 5) {
-                        const d = Math.sqrt((tile.position.x - tx)**2 + (tile.position.y - ty)**2);
-                        if (d < 4) {
-                            const f = (4 - d) / 4;
-                            tile.position.z = THREE.MathUtils.lerp(tile.position.z, f * 3, 0.1);
-                            tile.material.opacity = 0.4 + (f * 0.3);
-                        } else {
-                            tile.position.z = THREE.MathUtils.lerp(tile.position.z, 0, 0.08);
-                            tile.material.opacity = 0.4;
+            // ADDED: Logic router for the two different scenes
+            if (isTerrainMode) {
+                camera.position.z -= 1.35;
+                camera.position.x = Math.sin(timeNow * 0.3) * 25; 
+                camera.rotation.z = Math.sin(timeNow * 0.3) * 0.08; 
+                terrainStars.position.z = camera.position.z - 1500;
+                terrainStars.position.x = camera.position.x * 0.95; 
+                updateTerrainGrid();
+            } else {
+                if (namePlane && !isWarping) {
+                    const pingPong = Math.sin(timeNow * 1.2); 
+                    sweepLight.position.x = pingPong * 28; 
+                    sweepLight.position.y = -pingPong * 10; 
+                    const breath = 0.45 + ((Math.sin(timeNow * 2.2) + 1) / 2) * 0.40; 
+                    glowPlane.material.opacity = 0.3 + (0.28 * breath); 
+                    glowPlane.scale.set(1.08 + (breath * 0.07), 1.08 + (breath * 0.07), 1);
+                    nameLight.intensity = (230 + (breath * 165)); 
+                    namePlane.material.emissiveIntensity = 0.45 + (breath * 0.38);
+                    const tx = mouse.x * 10, ty = mouse.y * 6;
+                    for(let i=0; i<tiles.length; i++){
+                        const tile = tiles[i];
+                        if(Math.abs(tile.position.z) < 5) {
+                            const d = Math.sqrt((tile.position.x - tx)**2 + (tile.position.y - ty)**2);
+                            if (d < 4) {
+                                const f = (4 - d) / 4;
+                                tile.position.z = THREE.MathUtils.lerp(tile.position.z, f * 3, 0.1);
+                                tile.material.opacity = 0.4 + (f * 0.3);
+                            } else {
+                                tile.position.z = THREE.MathUtils.lerp(tile.position.z, 0, 0.08);
+                                tile.material.opacity = 0.4;
+                            }
                         }
                     }
                 }
-            }
 
-            if(isWarping && !arrived) {
-                camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 60);
-                camera.updateProjectionMatrix();
-            } else if (arrived) {
-                camera.fov = THREE.MathUtils.lerp(camera.fov, 75, 0.1);
-                camera.updateProjectionMatrix();
-            }
-
-            for(let i=0; i<orbs.length; i++) {
-                const o = orbs[i];
-                o.data.a += o.data.speed;
-                let currentR = THREE.MathUtils.lerp(o.data.r, o.data.r + 5, isWarping ? warpProgress : 0);
-                const sinA = Math.sin(o.data.a);
-                const zPos = THREE.MathUtils.lerp(-8, -15, isWarping ? warpProgress : 0);
-                if(o.data.type === 'v') {
-                    o.position.x = Math.sin(o.data.a * 0.3) * 3; o.position.y = Math.cos(o.data.a) * currentR; o.position.z = zPos + (sinA * (currentR * 1.2));
-                } else {
-                    o.position.x = Math.cos(o.data.a) * currentR; o.position.y = Math.sin(o.data.a * 0.5) * 4; o.position.z = zPos + (sinA * (currentR * 1.1));
+                if(isWarping && !arrived) {
+                    camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 60);
+                    camera.updateProjectionMatrix();
+                } else if (arrived) {
+                    camera.fov = THREE.MathUtils.lerp(camera.fov, 75, 0.1);
+                    camera.updateProjectionMatrix();
                 }
-            }
 
-            if (isSpelling) {
-                const posAttr = nebula.geometry.attributes.position;
-                const colAttr = nebula.geometry.attributes.color;
-                const tarAttr = isCredits ? nebula.geometry.attributes.creditsTarget : nebula.geometry.attributes.target;
-                for (let i = 0; i < posAttr.count; i++) {
-                    const i3 = i * 3;
-                    posAttr.array[i3] = THREE.MathUtils.lerp(posAttr.array[i3], tarAttr.array[i3], 0.04);
-                    posAttr.array[i3+1] = THREE.MathUtils.lerp(posAttr.array[i3+1], tarAttr.array[i3+1], 0.04);
-                    posAttr.array[i3+2] = THREE.MathUtils.lerp(posAttr.array[i3+2], tarAttr.array[i3+2], 0.04);
-                    const wave = Math.sin(i * 0.8 + timeNow * 8.0);
-                    const flash = Math.pow(Math.max(0, wave), 8) * 1.5; 
-                    colAttr.array[i3] = 1.0 * (0.02 + flash); colAttr.array[i3+1] = 0.85 * (0.02 + flash); colAttr.array[i3+2] = 0.2 * (0.02 + flash);
+                for(let i=0; i<orbs.length; i++) {
+                    const o = orbs[i];
+                    o.data.a += o.data.speed;
+                    let currentR = THREE.MathUtils.lerp(o.data.r, o.data.r + 5, isWarping ? warpProgress : 0);
+                    const sinA = Math.sin(o.data.a);
+                    const zPos = THREE.MathUtils.lerp(-8, -15, isWarping ? warpProgress : 0);
+                    if(o.data.type === 'v') {
+                        o.position.x = Math.sin(o.data.a * 0.3) * 3; o.position.y = Math.cos(o.data.a) * currentR; o.position.z = zPos + (sinA * (currentR * 1.2));
+                    } else {
+                        o.position.x = Math.cos(o.data.a) * currentR; o.position.y = Math.sin(o.data.a * 0.5) * 4; o.position.z = zPos + (sinA * (currentR * 1.1));
+                    }
                 }
-                posAttr.needsUpdate = true; colAttr.needsUpdate = true;
-                nebula.rotation.set(-artifact.rotation.x, -artifact.rotation.y, -artifact.rotation.z);
-                if (!isCredits) buttonBox.material.opacity = 0.4 + Math.sin(timeNow * 2) * 0.2;
-                raycaster.setFromCamera(mouse, camera);
-                const hover = raycaster.intersectObjects([nebula, buttonBox], true);
-                document.body.style.cursor = (hover.length > 0) ? 'pointer' : 'crosshair';
-            }
 
-            if (panelGroup && panelGroup.visible) {
-                panelGroup.rotation.y = THREE.MathUtils.lerp(panelGroup.rotation.y, mouse.x * 0.2, 0.1);
-                panelGroup.rotation.x = THREE.MathUtils.lerp(panelGroup.rotation.x, -0.15 + (mouse.y * 0.1), 0.1);
-                panelGroup.position.y = -6 + Math.sin(timeNow * 1.5) * 0.15;
-                raycaster.setFromCamera(mouse, camera);
-                const isHovered = raycaster.intersectObjects(panelGroup.children).length > 0;
-                document.body.style.cursor = isHovered ? 'pointer' : 'crosshair';
-                outerWire.material.color.setHex(isHovered ? 0xffffff : 0x00ff41);
-            }
-
-            // FIXED: Star Loop logic to prevent gaps during warp
-            for(let i=0; i<starObjects.length; i++) {
-                const s = starObjects[i];
-                let warpFactor = isWarping && !arrived ? Math.pow(Math.sin(warpProgress * Math.PI), 2) * 85 : 0;
-                let speed = s.userData.speed + warpFactor;
-                s.position.z += speed;
-
-                // Reset threshold is now behind the camera (z > 50)
-                if (s.position.z > 50) {
-                    resetStar(s);
-                    // Push them further back during warp to create a deeper star pool
-                    if (isWarping) s.position.z = -4000;
+                if (isSpelling) {
+                    const posAttr = nebula.geometry.attributes.position;
+                    const colAttr = nebula.geometry.attributes.color;
+                    const tarAttr = isCredits ? nebula.geometry.attributes.creditsTarget : nebula.geometry.attributes.target;
+                    for (let i = 0; i < posAttr.count; i++) {
+                        const i3 = i * 3;
+                        posAttr.array[i3] = THREE.MathUtils.lerp(posAttr.array[i3], tarAttr.array[i3], 0.04);
+                        posAttr.array[i3+1] = THREE.MathUtils.lerp(posAttr.array[i3+1], tarAttr.array[i3+1], 0.04);
+                        posAttr.array[i3+2] = THREE.MathUtils.lerp(posAttr.array[i3+2], tarAttr.array[i3+2], 0.04);
+                        const wave = Math.sin(i * 0.8 + timeNow * 8.0);
+                        const flash = Math.pow(Math.max(0, wave), 8) * 1.5; 
+                        colAttr.array[i3] = 1.0 * (0.02 + flash); colAttr.array[i3+1] = 0.85 * (0.02 + flash); colAttr.array[i3+2] = 0.2 * (0.02 + flash);
+                    }
+                    posAttr.needsUpdate = true; colAttr.needsUpdate = true;
+                    nebula.rotation.set(-artifact.rotation.x, -artifact.rotation.y, -artifact.rotation.z);
+                    if (!isCredits) buttonBox.material.opacity = 0.4 + Math.sin(timeNow * 2) * 0.2;
+                    raycaster.setFromCamera(mouse, camera);
+                    const hover = raycaster.intersectObjects([nebula, buttonBox], true);
+                    document.body.style.cursor = (hover.length > 0) ? 'pointer' : 'crosshair';
                 }
-            }
 
-            if (artifact.visible) {
-                artifact.rotation.y += 0.002;
-                artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 0.4, 0.05);
-                artifact.rotation.y += mouse.x * 0.01;
+                if (panelGroup && panelGroup.visible) {
+                    panelGroup.rotation.y = THREE.MathUtils.lerp(panelGroup.rotation.y, mouse.x * 0.2, 0.1);
+                    panelGroup.rotation.x = THREE.MathUtils.lerp(panelGroup.rotation.x, -0.15 + (mouse.y * 0.1), 0.1);
+                    panelGroup.position.y = -6 + Math.sin(timeNow * 1.5) * 0.15;
+                    raycaster.setFromCamera(mouse, camera);
+                    const isHovered = raycaster.intersectObjects(panelGroup.children).length > 0;
+                    document.body.style.cursor = isHovered ? 'pointer' : 'crosshair';
+                    outerWire.material.color.setHex(isHovered ? 0xffffff : 0x00ff41);
+                }
+
+                for(let i=0; i<starObjects.length; i++) {
+                    const s = starObjects[i];
+                    let warpFactor = isWarping && !arrived ? Math.pow(Math.sin(warpProgress * Math.PI), 2) * 85 : 0;
+                    let speed = s.userData.speed + warpFactor;
+                    s.position.z += speed;
+                    if (s.position.z > 50) {
+                        resetStar(s);
+                        if (isWarping) s.position.z = -4000;
+                    }
+                }
+
+                if (artifact.visible) {
+                    artifact.rotation.y += 0.002;
+                    artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 0.4, 0.05);
+                    artifact.rotation.y += mouse.x * 0.01;
+                }
             }
 
             renderer.render(scene, camera);
