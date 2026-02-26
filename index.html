@@ -96,55 +96,56 @@
     .star-wars-stage { 
         perspective: 3000px; 
         perspective-origin: 50% 100%;
-        overflow: visible; /* Ensures 3D effects aren't cropped by the container */
+        overflow: visible; 
     }
 
     .crawl-plane { 
         width: 100%; 
-        /* Reduced translateZ to -500px so it stays visible */
         transform: rotateX(70deg) translateZ(-500px); 
         transform-origin: 50% 0%;
         z-index: 150;
     }
 
     .crawl-content { 
-        font-size: 1.1rem; 
-        width: 80%; /* Slightly wider for better readability */
-        position: absolute;
+        /* 1. INCREASED FONT SIZE (from 1.1rem to 1.4rem) */
+        font-size: 1.4rem; 
         
-        /* The Centering Duo */
+        /* 2. ADJUSTED WIDTH to keep the bigger text in the safe zone */
+        width: 85%; 
+        position: absolute;
         left: 50%;
         transform: translateX(-50%); 
         
-        top: 200vh; /* Brought the spawn point up slightly to see it sooner */
-        line-height: 1.6; 
+        /* 3. REDUCED START DISTANCE (from 200vh to 125vh for a faster start) */
+        top: 125vh; 
+        
+        line-height: 1.5; 
         font-weight: 900;
         text-align: justify;
         text-justify: inter-word;
-        
         letter-spacing: 0.05em; 
         -webkit-font-smoothing: antialiased;
-        text-shadow: 0 0 2px rgba(254, 218, 74, 0.8); 
+        text-shadow: 0 0 3px rgba(254, 218, 74, 0.8); 
         backface-visibility: hidden;
     }
 
-    /* Keep Title exactly like this for perfect centering */
     .title h1 { 
-        font-size: 2.2rem; 
+        font-size: 2.8rem; /* Scaled up title to match bigger body text */
         text-align: center;
         width: 100%;
-        margin: 0 auto 50px auto;
+        margin-bottom: 60px;
         transform: scaleY(1.4);
     }
 
     .crawl-active .crawl-content {
+        /* You can reduce the 140s to 120s if you want the whole scroll to be faster too */
         animation: scroll-up-mobile 140s linear forwards;
     }
 
     @keyframes scroll-up-mobile {
         0% { 
-            top: 200vh; 
-            /* Must match the translateX above to keep it centered */
+            /* MATCH the 125vh from above */
+            top: 125vh; 
             transform: translateX(-50%) scale(1); 
         }
         100% { 
@@ -153,7 +154,6 @@
         }
     }
 }
-  
 </style>
 </style>
 </head>
