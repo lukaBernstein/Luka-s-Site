@@ -92,30 +92,37 @@
             100% { top: -15000px; }
         }
 
-       @media screen and (max-width: 768px) {
+    
+    /* ... (keep desktop styles exactly as they are) ... */
+
+    /* MOBILE FIXES */
+    @media screen and (max-width: 768px) {
         .crawl-content { 
             font-size: 1.6rem; 
-            /* Synchronize this with the animation starting point */
-            top: 300vh; 
+            /* Reduced from 300vh to 120vh to bring it in front of the camera */
+            top: 120vh; 
             line-height: 1.2; 
+            /* Ensures the plane is rendered correctly in 3D space */
+            backface-visibility: hidden;
         }
         .title h1 { font-size: 3.5rem; }
         .star-wars-stage { 
-            perspective: 600px; /* Shallower perspective prevents text cutoff at the top */
+            perspective: 800px; /* Slightly increased for better depth */
+            perspective-origin: 50% 80%; /* Shifts the 'vanishing point' to help visibility */
         }
         .crawl-plane { 
             width: 95%; 
-            transform: rotateX(60deg); 
+            transform: rotateX(65deg); 
+            z-index: 150;
         }
 
-        /* Use a dedicated mobile animation to avoid conflicts with desktop values */
         .crawl-active .crawl-content {
-            animation: scroll-up-mobile 160s linear forwards;
+            animation: scroll-up-mobile 140s linear forwards;
         }
 
         @keyframes scroll-up-mobile {
             0% { 
-                top: 300vh; 
+                top: 120vh; 
             }
             100% { 
                 top: -10000px; 
