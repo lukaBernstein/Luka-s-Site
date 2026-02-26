@@ -117,7 +117,7 @@
         transform: translateX(-50%); 
         
         /* 3. REDUCED START DISTANCE (from 200vh to 125vh for a faster start) */
-        top: 175vh; 
+        top: 100vh; 
         
         line-height: 1.5; 
         font-weight: 900;
@@ -171,6 +171,21 @@
             transform: translateX(-50%) scale(0.4); 
         }
     }
+    button#start-button, 
+.start-button,
+button { 
+    /* Reduce font size by 25% (assuming desktop was ~1.2rem) */
+    font-size: 0.85rem !important; 
+    
+    /* Shrink the button's footprint */
+    padding: 8px 16px !important; 
+    
+    /* Ensure it doesn't stretch too wide */
+    min-width: 150px !important;
+    
+    /* Adjust positioning if it feels too cramped */
+    bottom: 10% !important; 
+}
 }
 </style>
 </style>
