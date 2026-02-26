@@ -94,25 +94,31 @@
 
         /* MOBILE FIXES */
         @media screen and (max-width: 768px) {
-            .crawl-content { 
-                font-size: 1.6rem; 
-                top: 300vh; /* Start much lower to accommodate shallower perspective */
-                line-height: 1.2; 
-            }
-            .title h1 { font-size: 3.5rem; }
-            .star-wars-stage { 
-                perspective: 600px; /* Reduced perspective to prevent text cutoff at the top */
-            }
-            .crawl-plane { 
-                width: 95%; /* Wider plane for mobile screens */
-                transform: rotateX(60deg); 
-            }
-            @keyframes scroll-up {
-                0% { top: 300vh; } /* Matched with .crawl-content top */
-                100% { top: -10000px; }
-            }
+        .crawl-content { 
+            font-size: 1.6rem; 
+            top: 300vh; /* Matches the animation start */
+            line-height: 1.2; 
         }
-    </style>
+        .title h1 { font-size: 3.5rem; }
+        .star-wars-stage { 
+            perspective: 600px; /* Reduced to prevent top-screen cutoff */
+        }
+        .crawl-plane { 
+            width: 95%; 
+            transform: rotateX(60deg); 
+        }
+
+        /* Updated animation to ensure it starts from the new 300vh position */
+        .crawl-active .crawl-content {
+            animation: scroll-up-mobile 160s linear forwards;
+        }
+
+        @keyframes scroll-up-mobile {
+            0% { top: 300vh; }
+            100% { top: -10000px; }
+        }
+    }
+</style>
 </head>
 <body>
 
