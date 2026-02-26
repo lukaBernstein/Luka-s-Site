@@ -323,13 +323,19 @@
         }
 
         function revealPanel() {
-            panelGroup.visible = true;
-            panelReady = true;
-            gsap.to(panelGroup.position, { z: -20, duration: 2, ease: "expo.out" });
-            gsap.to(outerWire.material, { opacity: 1, duration: 0.1, repeat: 5, yoyo: true });
-            gsap.to(panelTextMesh.material, { opacity: 1, duration: 1.5, delay: 0.5 });
-            gsap.to(innerWire.material, { opacity: 0.5, duration: 1.5, delay: 0.8 });
-        }
+    panelGroup.visible = true;
+    panelReady = true;
+    gsap.to(panelGroup.position, { z: -20, duration: 2, ease: "expo.out" });
+    
+    // REMOVE OR COMMENT OUT THIS LINE BELOW:
+    // gsap.to(outerWire.material, { opacity: 1, duration: 0.1, repeat: 5, yoyo: true }); 
+    
+    // ADD THIS LINE INSTEAD to simply fade the border in with the text:
+    gsap.to(outerWire.material, { opacity: 1, duration: 1.5, delay: 0.5 });
+
+    gsap.to(panelTextMesh.material, { opacity: 1, duration: 1.5, delay: 0.5 });
+    gsap.to(innerWire.material, { opacity: 0.5, duration: 1.5, delay: 0.8 });
+}
 
         function rollCreditsSequence() {
             if (isPanning) return;
