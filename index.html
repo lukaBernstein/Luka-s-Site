@@ -391,27 +391,10 @@ if (window.innerWidth < 768) {
             gsap.to(mainGroup.position, { y: -500, z: -500, duration: 3, ease: "power3.in" });
             gsap.to(tileGroup.position, { y: -500, duration: 3, ease: "power3.in" });
             
-            setTimeout(() => { 
-    artifact.visible = true; 
-    
-    const isMobile = window.innerWidth < 768;
-    const targetZ = isMobile ? -28 : -15; // Pushed back slightly more for mobile
-    const targetFOV = isMobile ? 85 : 75;
-
-    // Move the object and zoom the camera in one synchronized motion
-    gsap.to(artifact.position, { 
-        z: targetZ, 
-        duration: 2, 
-        ease: "power2.out" 
-    });
-
-    gsap.to(camera, { 
-        fov: targetFOV, 
-        duration: 2, 
-        ease: "power2.out",
-        onUpdate: () => camera.updateProjectionMatrix() // Forces the camera to refresh every frame
-    });
-}, 2800);
+            setTimeout(() => {
+                container.classList.add('crawl-active');
+                setTimeout(() => { revealPanel(); }, 25000);
+            }, 3200); 
         }
 
         // Terrain Setup and Logic Functions
@@ -568,7 +551,9 @@ if (window.innerWidth < 768) {
             sweepLight.position.set(-20, 10, -5); scene.add(sweepLight);
             artifact = createObsidianPolyhedron();
             nebula = createNebula(); artifact.add(nebula);
-            
+            if (window.innerWidth < 768) {
+    nebula.scale.set(1.2, 1.2, 1.2); // Make the text 20% larger to compensate for the zoom-out
+}
             artifact.position.z = -1500; artifact.visible = false;
             mainGroup.add(artifact);
             const boxGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(24, 8));
@@ -742,14 +727,10 @@ if (window.innerWidth < 768) {
         if(isWarping && !arrived) {
             camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 85);
             camera.updateProjectionMatrix();
-        } 
-        // Inside animate() function:
-if (isWarping && !arrived) {
-    camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 85);
-    camera.updateProjectionMatrix();
-} 
-// REMOVE the "else if (arrived)" block from here entirely.
-// We will handle the "settling" FOV in the GSAP timeline instead.
+        } else if (arrived) {
+            camera.fov = THREE.MathUtils.lerp(camera.fov, 75, 0.1);
+            camera.updateProjectionMatrix();
+        }
 
         for(let i=0; i<orbs.length; i++) {
             const o = orbs[i];
