@@ -258,39 +258,59 @@
         }
 
         function createPanelButton() {
-            panelGroup = new THREE.Group();
-            panelGroup.visible = false;
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = 2048; canvas.height = 512;
-            const panelWidth = 40; const panelHeight = 5.2;
-            const outerGeo = new THREE.BoxGeometry(panelWidth, panelHeight, 0.5);
-            outerWire = new THREE.LineSegments(new THREE.EdgesGeometry(outerGeo), new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0 }));
-            const innerGeo = new THREE.BoxGeometry(panelWidth - 0.8, panelHeight - 0.8, 0.2);
-            innerWire = new THREE.LineSegments(new THREE.EdgesGeometry(innerGeo), new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0 }));
-            const glassMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 });
-            const glassPanel = new THREE.Mesh(new THREE.PlaneGeometry(panelWidth, panelHeight), glassMat);
-            const faceMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
-            panelTextMesh = new THREE.Mesh(new THREE.PlaneGeometry(panelWidth - 1, panelHeight - 1), faceMat);
-            panelTextMesh.position.z = 0.3;
-            panelTextMesh.scale.y = 1.3;
-            document.fonts.load('900 74px Inter').then(() => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#00ff41';
-                ctx.font = '900 74px Inter, sans-serif'; 
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.shadowColor = '#00ff41'; ctx.shadowBlur = 10;
-                ctx.fillText('SHOW ME WHAT ELSE THIS GUY CAN DO!', 1024, 256);
-                faceMat.map = new THREE.CanvasTexture(canvas);
-                faceMat.needsUpdate = true;
-            });
-            panelGroup.add(outerWire, innerWire, glassPanel, panelTextMesh);
-            camera.add(panelGroup);
-            panelGroup.position.set(0, -6, -25);
-            panelGroup.rotation.x = -0.15;
-            return panelGroup;
-        }
+    panelGroup = new THREE.Group();
+    panelGroup.visible = false;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Texture resolution
+    canvas.width = 2048; 
+    canvas.height = 512;
+    
+    // Panel dimensions
+    const panelWidth = 42; 
+    const panelHeight = 5.2;
+    
+    const outerGeo = new THREE.BoxGeometry(panelWidth, panelHeight, 0.5);
+    outerWire = new THREE.LineSegments(new THREE.EdgesGeometry(outerGeo), new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0 }));
+    
+    const innerGeo = new THREE.BoxGeometry(panelWidth - 0.8, panelHeight - 0.8, 0.2);
+    innerWire = new THREE.LineSegments(new THREE.EdgesGeometry(innerGeo), new THREE.LineBasicMaterial({ color: 0x00ff41, transparent: true, opacity: 0 }));
+    
+    const glassMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 });
+    const glassPanel = new THREE.Mesh(new THREE.PlaneGeometry(panelWidth, panelHeight), glassMat);
+    
+    const faceMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
+    
+    // Text Mesh sizing
+    panelTextMesh = new THREE.Mesh(new THREE.PlaneGeometry(41.5, panelHeight - 0.5), faceMat);
+    panelTextMesh.position.z = 0.3;
+    panelTextMesh.scale.y = 1.45; 
+    
+    document.fonts.load('900 90px Inter').then(() => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#00ff41';
+        
+        ctx.font = '900 90px Inter, sans-serif'; 
+        ctx.textAlign = 'center'; 
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = '#00ff41'; 
+        ctx.shadowBlur = 10;
+        
+        ctx.fillText('SHOW ME WHAT ELSE THIS GUY CAN DO!', 1024, 256);
+        faceMat.map = new THREE.CanvasTexture(canvas);
+        faceMat.needsUpdate = true;
+    });
 
+    panelGroup.add(outerWire, innerWire, glassPanel, panelTextMesh);
+    camera.add(panelGroup);
+
+    // FIXED: Centered at 0 Y-axis and 0 rotation
+    panelGroup.position.set(0, 0, -25);
+    panelGroup.rotation.set(0, 0, 0);
+
+    return panelGroup;
+}
         function revealPanel() {
             panelGroup.visible = true;
             panelReady = true;
@@ -605,116 +625,118 @@
             }
         }
 
-        function animate() {
-            requestAnimationFrame(animate);
-            const timeNow = clock.getElapsedTime();
+       function animate() {
+    requestAnimationFrame(animate);
+    const timeNow = clock.getElapsedTime();
 
-            if (isTerrainMode) {
-                camera.position.z -= 1.35;
-                camera.position.x = Math.sin(timeNow * 0.3) * 25; 
-                camera.rotation.z = Math.sin(timeNow * 0.3) * 0.08; 
-                terrainStars.position.z = camera.position.z - 1500;
-                terrainStars.position.x = camera.position.x * 0.95; 
-                updateTerrainGrid();
-            } else {
-                if (namePlane && !isWarping) {
-                    const pingPong = Math.sin(timeNow * 1.2); 
-                    sweepLight.position.x = pingPong * 28; 
-                    sweepLight.position.y = -pingPong * 10; 
-                    const breath = 0.45 + ((Math.sin(timeNow * 2.2) + 1) / 2) * 0.40; 
-                    glowPlane.material.opacity = 0.3 + (0.28 * breath); 
-                    glowPlane.scale.set(1.08 + (breath * 0.07), 1.08 + (breath * 0.07), 1);
-                    nameLight.intensity = (230 + (breath * 165)); 
-                    namePlane.material.emissiveIntensity = 0.45 + (breath * 0.38);
-                    const tx = mouse.x * 10, ty = mouse.y * 6;
-                    for(let i=0; i<tiles.length; i++){
-                        const tile = tiles[i];
-                        if(Math.abs(tile.position.z) < 5) {
-                            const d = Math.sqrt((tile.position.x - tx)**2 + (tile.position.y - ty)**2);
-                            if (d < 4) {
-                                const f = (4 - d) / 4;
-                                tile.position.z = THREE.MathUtils.lerp(tile.position.z, f * 3, 0.1);
-                                tile.material.opacity = 0.4 + (f * 0.3);
-                            } else {
-                                tile.position.z = THREE.MathUtils.lerp(tile.position.z, 0, 0.08);
-                                tile.material.opacity = 0.4;
-                            }
-                        }
-                    }
-                }
-
-                if(isWarping && !arrived) {
-                    camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 85);
-                    camera.updateProjectionMatrix();
-                } else if (arrived) {
-                    camera.fov = THREE.MathUtils.lerp(camera.fov, 75, 0.1);
-                    camera.updateProjectionMatrix();
-                }
-
-                for(let i=0; i<orbs.length; i++) {
-                    const o = orbs[i];
-                    o.data.a += o.data.speed;
-                    let currentR = THREE.MathUtils.lerp(o.data.r, o.data.r + 5, isWarping ? warpProgress : 0);
-                    const sinA = Math.sin(o.data.a);
-                    const zPos = THREE.MathUtils.lerp(-8, -15, isWarping ? warpProgress : 0);
-                    if(o.data.type === 'v') {
-                        o.position.x = Math.sin(o.data.a * 0.3) * 3; o.position.y = Math.cos(o.data.a) * currentR; o.position.z = zPos + (sinA * (currentR * 1.2));
+    if (isTerrainMode) {
+        camera.position.z -= 1.35;
+        camera.position.x = Math.sin(timeNow * 0.3) * 25; 
+        camera.rotation.z = Math.sin(timeNow * 0.3) * 0.08; 
+        terrainStars.position.z = camera.position.z - 1500;
+        terrainStars.position.x = camera.position.x * 0.95; 
+        updateTerrainGrid();
+    } else {
+        if (namePlane && !isWarping) {
+            const pingPong = Math.sin(timeNow * 1.2); 
+            sweepLight.position.x = pingPong * 28; 
+            sweepLight.position.y = -pingPong * 10; 
+            const breath = 0.45 + ((Math.sin(timeNow * 2.2) + 1) / 2) * 0.40; 
+            glowPlane.material.opacity = 0.3 + (0.28 * breath); 
+            glowPlane.scale.set(1.08 + (breath * 0.07), 1.08 + (breath * 0.07), 1);
+            nameLight.intensity = (230 + (breath * 165)); 
+            namePlane.material.emissiveIntensity = 0.45 + (breath * 0.38);
+            const tx = mouse.x * 10, ty = mouse.y * 6;
+            for(let i=0; i<tiles.length; i++){
+                const tile = tiles[i];
+                if(Math.abs(tile.position.z) < 5) {
+                    const d = Math.sqrt((tile.position.x - tx)**2 + (tile.position.y - ty)**2);
+                    if (d < 4) {
+                        const f = (4 - d) / 4;
+                        tile.position.z = THREE.MathUtils.lerp(tile.position.z, f * 3, 0.1);
+                        tile.material.opacity = 0.4 + (f * 0.3);
                     } else {
-                        o.position.x = Math.cos(o.data.a) * currentR; o.position.y = Math.sin(o.data.a * 0.5) * 4; o.position.z = zPos + (sinA * (currentR * 1.1));
+                        tile.position.z = THREE.MathUtils.lerp(tile.position.z, 0, 0.08);
+                        tile.material.opacity = 0.4;
                     }
-                }
-
-                if (isSpelling) {
-                    const posAttr = nebula.geometry.attributes.position;
-                    const colAttr = nebula.geometry.attributes.color;
-                    const tarAttr = isCredits ? nebula.geometry.attributes.creditsTarget : nebula.geometry.attributes.target;
-                    for (let i = 0; i < posAttr.count; i++) {
-                        const i3 = i * 3;
-                        posAttr.array[i3] = THREE.MathUtils.lerp(posAttr.array[i3], tarAttr.array[i3], 0.015);
-                        posAttr.array[i3+1] = THREE.MathUtils.lerp(posAttr.array[i3+1], tarAttr.array[i3+1], 0.015);
-                        posAttr.array[i3+2] = THREE.MathUtils.lerp(posAttr.array[i3+2], tarAttr.array[i3+2], 0.015);
-                        const wave = Math.sin(i * 0.8 + timeNow * 8.0);
-                        const flash = Math.pow(Math.max(0, wave), 8) * 1.5; 
-                        colAttr.array[i3] = 1.0 * (0.02 + flash); colAttr.array[i3+1] = 0.85 * (0.02 + flash); colAttr.array[i3+2] = 0.2 * (0.02 + flash);
-                    }
-                    posAttr.needsUpdate = true; colAttr.needsUpdate = true;
-                    nebula.rotation.set(-artifact.rotation.x, -artifact.rotation.y, -artifact.rotation.z);
-                    if (!isCredits) buttonBox.material.opacity = 0.4 + Math.sin(timeNow * 2) * 0.2;
-                    raycaster.setFromCamera(mouse, camera);
-                    const hover = raycaster.intersectObjects([nebula, buttonBox], true);
-                    document.body.style.cursor = (hover.length > 0) ? 'pointer' : 'crosshair';
-                }
-
-                if (panelGroup && panelGroup.visible) {
-                    panelGroup.rotation.y = THREE.MathUtils.lerp(panelGroup.rotation.y, mouse.x * 0.2, 0.1);
-                    panelGroup.rotation.x = THREE.MathUtils.lerp(panelGroup.rotation.x, -0.15 + (mouse.y * 0.1), 0.1);
-                    panelGroup.position.y = -6 + Math.sin(timeNow * 1.5) * 0.15;
-                    raycaster.setFromCamera(mouse, camera);
-                    const isHovered = raycaster.intersectObjects(panelGroup.children).length > 0;
-                    document.body.style.cursor = isHovered ? 'pointer' : 'crosshair';
-                    outerWire.material.color.setHex(isHovered ? 0xffffff : 0x00ff41);
-                }
-
-                for(let i=0; i<starObjects.length; i++) {
-                    const s = starObjects[i];
-                    let warpFactor = isWarping && !arrived ? Math.pow(Math.sin(warpProgress * Math.PI), 2) * 85 : 0;
-                    let speed = s.userData.speed + warpFactor;
-                    s.position.z += speed;
-                    if (s.position.z > 50) {
-                        resetStar(s);
-                        if (isWarping) s.position.z = -4000;
-                    }
-                }
-
-                if (artifact.visible) {
-                    artifact.rotation.y += 0.002;
-                    artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 0.4, 0.05);
-                    artifact.rotation.y += mouse.x * 0.01;
                 }
             }
-
-            renderer.render(scene, camera);
         }
+
+        if(isWarping && !arrived) {
+            camera.fov = 75 + (Math.pow(Math.sin(warpProgress * Math.PI), 1.5) * 85);
+            camera.updateProjectionMatrix();
+        } else if (arrived) {
+            camera.fov = THREE.MathUtils.lerp(camera.fov, 75, 0.1);
+            camera.updateProjectionMatrix();
+        }
+
+        for(let i=0; i<orbs.length; i++) {
+            const o = orbs[i];
+            o.data.a += o.data.speed;
+            let currentR = THREE.MathUtils.lerp(o.data.r, o.data.r + 5, isWarping ? warpProgress : 0);
+            const sinA = Math.sin(o.data.a);
+            const zPos = THREE.MathUtils.lerp(-8, -15, isWarping ? warpProgress : 0);
+            if(o.data.type === 'v') {
+                o.position.x = Math.sin(o.data.a * 0.3) * 3; o.position.y = Math.cos(o.data.a) * currentR; o.position.z = zPos + (sinA * (currentR * 1.2));
+            } else {
+                o.position.x = Math.cos(o.data.a) * currentR; o.position.y = Math.sin(o.data.a * 0.5) * 4; o.position.z = zPos + (sinA * (currentR * 1.1));
+            }
+        }
+
+        if (isSpelling) {
+            const posAttr = nebula.geometry.attributes.position;
+            const colAttr = nebula.geometry.attributes.color;
+            const tarAttr = isCredits ? nebula.geometry.attributes.creditsTarget : nebula.geometry.attributes.target;
+            for (let i = 0; i < posAttr.count; i++) {
+                const i3 = i * 3;
+                posAttr.array[i3] = THREE.MathUtils.lerp(posAttr.array[i3], tarAttr.array[i3], 0.015);
+                posAttr.array[i3+1] = THREE.MathUtils.lerp(posAttr.array[i3+1], tarAttr.array[i3+1], 0.015);
+                posAttr.array[i3+2] = THREE.MathUtils.lerp(posAttr.array[i3+2], tarAttr.array[i3+2], 0.015);
+                const wave = Math.sin(i * 0.8 + timeNow * 8.0);
+                const flash = Math.pow(Math.max(0, wave), 8) * 1.5; 
+                colAttr.array[i3] = 1.0 * (0.02 + flash); colAttr.array[i3+1] = 0.85 * (0.02 + flash); colAttr.array[i3+2] = 0.2 * (0.02 + flash);
+            }
+            posAttr.needsUpdate = true; colAttr.needsUpdate = true;
+            nebula.rotation.set(-artifact.rotation.x, -artifact.rotation.y, -artifact.rotation.z);
+            if (!isCredits) buttonBox.material.opacity = 0.4 + Math.sin(timeNow * 2) * 0.2;
+            raycaster.setFromCamera(mouse, camera);
+            const hover = raycaster.intersectObjects([nebula, buttonBox], true);
+            document.body.style.cursor = (hover.length > 0) ? 'pointer' : 'crosshair';
+        }
+
+        if (panelGroup && panelGroup.visible) {
+            panelGroup.rotation.y = THREE.MathUtils.lerp(panelGroup.rotation.y, mouse.x * 0.2, 0.1);
+            // FIXED: Removed -0.15 tilt
+            panelGroup.rotation.x = THREE.MathUtils.lerp(panelGroup.rotation.x, (mouse.y * 0.1), 0.1);
+            // FIXED: Set center to 0 for floating
+            panelGroup.position.y = 0 + Math.sin(timeNow * 1.5) * 0.15;
+            raycaster.setFromCamera(mouse, camera);
+            const isHovered = raycaster.intersectObjects(panelGroup.children).length > 0;
+            document.body.style.cursor = isHovered ? 'pointer' : 'crosshair';
+            outerWire.material.color.setHex(isHovered ? 0xffffff : 0x00ff41);
+        }
+
+        for(let i=0; i<starObjects.length; i++) {
+            const s = starObjects[i];
+            let warpFactor = isWarping && !arrived ? Math.pow(Math.sin(warpProgress * Math.PI), 2) * 85 : 0;
+            let speed = s.userData.speed + warpFactor;
+            s.position.z += speed;
+            if (s.position.z > 50) {
+                resetStar(s);
+                if (isWarping) s.position.z = -4000;
+            }
+        }
+
+        if (artifact.visible) {
+            artifact.rotation.y += 0.002;
+            artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 0.4, 0.05);
+            artifact.rotation.y += mouse.x * 0.01;
+        }
+    }
+
+    renderer.render(scene, camera);
+}
 
         function onResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
