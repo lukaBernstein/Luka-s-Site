@@ -354,6 +354,11 @@
     panelGroup.position.set(0, 0, -25);
     panelGroup.rotation.set(0, 0, 0);
 
+    // Inside createPanelButton, before return panelGroup;
+if (window.innerWidth < 768) {
+    panelGroup.scale.set(0.6, 0.6, 0.6); // Shrink the button to 60% size
+}
+
     return panelGroup;
 }
         function revealPanel() {
@@ -672,6 +677,7 @@
                 });
                 setTimeout(() => { 
                     artifact.visible = true; 
+                    const targetZ = window.innerWidth < 768 ? -25 : -15;
                     gsap.to(artifact.position, { z: -15, duration: 1.5, ease: "power3.out" }); 
                 }, 2800);
             }
