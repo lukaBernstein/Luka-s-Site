@@ -94,41 +94,50 @@
 
     
     /* ... (keep desktop styles exactly as they are) ... */
+/* MOBILE FIXES */
+@media screen and (max-width: 768px) {
+    .star-wars-stage { 
+        /* Increased perspective to move the camera further back */
+        perspective: 1000px; 
+        perspective-origin: 50% 100%; /* Look from the bottom up */
+    }
 
-    /* MOBILE FIXES */
-    @media screen and (max-width: 768px) {
-        .crawl-content { 
-            font-size: 1.6rem; 
-            /* Reduced from 300vh to 120vh to bring it in front of the camera */
-            top: 120vh; 
-            line-height: 1.2; 
-            /* Ensures the plane is rendered correctly in 3D space */
-            backface-visibility: hidden;
-        }
-        .title h1 { font-size: 3.5rem; }
-        .star-wars-stage { 
-            perspective: 800px; /* Slightly increased for better depth */
-            perspective-origin: 50% 80%; /* Shifts the 'vanishing point' to help visibility */
-        }
-        .crawl-plane { 
-            width: 95%; 
-            transform: rotateX(65deg); 
-            z-index: 150;
-        }
+    .crawl-plane { 
+        width: 95%; 
+        /* A slightly shallower angle prevents the "overhead" effect */
+        transform: rotateX(25deg); 
+        /* Pivot from the top so it recedes into the distance correctly */
+        transform-origin: 50% 0%;
+        z-index: 150;
+    }
 
-        .crawl-active .crawl-content {
-            animation: scroll-up-mobile 140s linear forwards;
-        }
+    .crawl-content { 
+        font-size: 1.4rem; 
+        /* Start much closer to the viewable area */
+        top: 100vh; 
+        line-height: 1.3; 
+        backface-visibility: hidden;
+    }
 
-        @keyframes scroll-up-mobile {
-            0% { 
-                top: 120vh; 
-            }
-            100% { 
-                top: -10000px; 
-            }
+    .title h1 { font-size: 3rem; }
+
+    .crawl-active .crawl-content {
+        animation: scroll-up-mobile 120s linear forwards;
+    }
+
+    @keyframes scroll-up-mobile {
+        0% { 
+            top: 100vh; 
+            /* Start slightly larger to feel "close" at the bottom */
+            transform: scale(1.2); 
+        }
+        100% { 
+            top: -8000px; 
+            /* Shrink as it goes into the distance */
+            transform: scale(0.5); 
         }
     }
+}
 </style>
 </style>
 </head>
