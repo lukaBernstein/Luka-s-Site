@@ -91,6 +91,51 @@
             0% { top: 225vh; }
             100% { top: -15000px; }
         }
+        /* Mobile Styles (Phones) */
+@media screen and (max-width: 768px) {
+    .crawl-content {
+        font-size: 1.8rem; /* Smaller text for small screens */
+        line-height: 1.2;
+    }
+
+    .title h1 {
+        font-size: 3.5rem; /* Shrink the 'LUKA BERNSTEIN' header */
+    }
+
+    .star-wars-stage {
+        perspective: 800px; /* Pulls camera back specifically for mobile aspect ratios */
+    }
+
+    .crawl-plane {
+        width: 90%; /* Give text more room on narrow screens */
+    }
+}
+@media screen and (max-width: 768px) {
+    /* Adjust the 3D depth for narrow screens */
+    .star-wars-stage {
+        perspective: 1000px; 
+    }
+
+    .crawl-plane {
+        width: 90%; /* Use more of the screen width */
+        transform: rotateX(60deg); /* Slightly less tilt so it stays in view */
+    }
+
+    /* Shrink font sizes so words don't break awkwardly */
+    .crawl-content {
+        font-size: 1.6rem; 
+        top: 150vh; /* Adjust start position for the smaller screen height */
+    }
+
+    .title h1 {
+        font-size: 3.5rem; 
+    }
+
+    @keyframes scroll-up {
+        0% { top: 150vh; }
+        100% { top: -10000px; }
+    }
+}
     </style>
 </head>
 <body>
@@ -538,6 +583,12 @@
             window.addEventListener('click', onClick);
             window.addEventListener('resize', onResize);
             animate();
+
+            if (window.innerWidth < 768) {
+    const mobileScale = window.innerWidth / 768; 
+    namePlane.scale.set(mobileScale, mobileScale, 1);
+    glowPlane.scale.set(mobileScale, mobileScale, 1);
+}
         }
 
         function generateGrid() {
@@ -739,12 +790,23 @@
     renderer.render(scene, camera);
 }
 
-        function onResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            generateGrid();
-        }
+       function onResize() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    camera.aspect = width / height;
+    
+    // If screen is narrow (portrait), increase FOV to "zoom out"
+    if (width < height) {
+        camera.fov = 85; 
+    } else {
+        camera.fov = 75;
+    }
+    
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height);
+    generateGrid();
+}
 
         init();
     </script>
