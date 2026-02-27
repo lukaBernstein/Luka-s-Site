@@ -464,10 +464,31 @@ function rollCreditsSequence() {
             });
         }
 
-        function setupScene2() {
+function startTerrainTransition() {
+            const overlay = document.getElementById('transition-overlay');
+            panelReady = false; 
+            gsap.to([outerWire.material, panelTextMesh.material], { opacity: 0, duration: 1.0 });
+            gsap.to(panelGroup.position, { z: -50, duration: 1.5, ease: "power2.in" });
+            gsap.to(overlay, { 
+                opacity: 1, 
+                duration: 1.5, 
+                onComplete: () => {
+                    scene.remove(mainGroup); scene.remove(starGroup); scene.remove(tileGroup);
+                    scene.remove(namePlane); scene.remove(glowPlane); scene.remove(nameLight);
+                    scene.remove(sweepLight); camera.remove(panelGroup);
+                    document.getElementById('crawl-container').style.display = 'none';
+                    setupScene2();
+                    gsap.to(overlay, { opacity: 0, duration: 2, delay: 0.5 });
+                    // FOG TWEAK: Set to 0.0035 for a clearer view
+                    gsap.to(scene.fog, { density: 0.0035, duration: 4, ease: "sine.inOut" });
+                }
+            });
+        }
+
+function setupScene2() {
             isTerrainMode = true;
             scene.background = new THREE.Color(VOID_PURPLE);
-            scene.fog = new THREE.FogExp2(VOID_PURPLE, 0.1); 
+            scene.fog = new THREE.FogExp2(VOID_PURPLE, 0.0035); 
             
             const height = isMobile() ? 35 : 21.8;
             camera.position.set(0, height, 0);
@@ -475,6 +496,7 @@ function rollCreditsSequence() {
             camera.fov = isMobile() ? 95 : 85;
             camera.updateProjectionMatrix();
 
+            // --- STARS ---
             const starGeo = new THREE.BufferGeometry();
             const starCount = 150000;
             const posArray = new Float32Array(starCount * 3);
@@ -483,13 +505,82 @@ function rollCreditsSequence() {
             terrainStars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2.8, transparent: true, sizeAttenuation: false, depthWrite: false }));
             terrainStars.renderOrder = -1; 
             scene.add(terrainStars);
-            scene.add(new THREE.HemisphereLight(0x443366, 0x330000, 1.5));
-            scene.add(new THREE.AmbientLight(0x442222, 0.3));
-            const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-            sun.position.set(50, 100, -100);
-            scene.add(sun);
+
+            // --- THE SOLE LIGHT SOURCE (Parented to Camera) ---
+            // Increased intensity to 2500. Decay is set to 1.2 for better reach.
+            const orbLight = new THREE.PointLight(0xffaa44, 2500, 1200, 1.2); 
+            // Positioned at the horizon relative to the camera
+            orbLight.position.set(0, 45, -200); 
+            camera.add(orbLight); // The light now follows you so it never "fades away"
+
+            // --- THE SOLID-CORE ORB ---
+            const orbCanvas = document.createElement('canvas');
+            orbCanvas.width = 512; orbCanvas.height = 512;
+            const ctx = orbCanvas.getContext('2d');
+            const gradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
+            gradient.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');   
+            gradient.addColorStop(0.4, 'rgba(255, 255, 255, 1.0)');   
+            gradient.addColorStop(0.45, 'rgba(255, 220, 100, 0.9)');  
+            gradient.addColorStop(0.8, 'rgba(255, 80, 20, 0.2)');     
+            gradient.addColorStop(1.0, 'rgba(0, 0, 0, 0)');            
+            ctx.fillStyle = gradient; ctx.fillRect(0, 0, 512, 512);
+
+            const orbMat = new THREE.SpriteMaterial({ 
+                map: new THREE.CanvasTexture(orbCanvas), 
+                blending: THREE.AdditiveBlending,
+                transparent: true,
+                depthTest: false,
+                depthWrite: false
+            });
+            const horizonOrb = new THREE.Sprite(orbMat);
+            horizonOrb.scale.set(180, 180, 1);
+            horizonOrb.renderOrder = 999; 
+            
+            const orbGroup = new THREE.Group();
+            orbGroup.position.set(0, 75, -200); 
+            orbGroup.add(horizonOrb);
+            camera.add(orbGroup); 
         }
 
+  function createTerrainTile(tx, tz) {
+            const geo = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE, TILE_RES, TILE_RES);
+            
+            // MATERIAL: Extreme metalness and very low roughness for maximum glint
+            const mat = new THREE.MeshStandardMaterial({ 
+                vertexColors: true, 
+                flatShading: true, 
+                metalness: 1.0,  
+                roughness: 0.15  
+            });
+            
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.rotation.x = -Math.PI / 2;
+            const ox = tx * TILE_SIZE, oz = tz * TILE_SIZE;
+            mesh.position.set(ox, 0, oz);
+            
+            const pos = geo.attributes.position, colors = new Float32Array(pos.count * 3);
+            const c1 = new THREE.Color(0x2a0505), c2 = new THREE.Color(0x990000), c3 = new THREE.Color(0xff2200), c4 = new THREE.Color(0xffcccc);
+            
+            for (let i = 0; i <= TILE_RES; i++) { 
+                for (let j = 0; j <= TILE_RES; j++) {
+                    const idx = i * (TILE_RES + 1) + j;
+                    const h = getTerrainHeight(ox + (j/TILE_RES-0.5)*TILE_SIZE, oz + (i/TILE_RES-0.5)*TILE_SIZE);
+                    pos.setZ(idx, h);
+                    let t = Math.max(0, Math.min(1, (h + 5) / 25));
+                    const col = new THREE.Color();
+                    if (t < 0.33) col.copy(c1).lerp(c2, t * 3); 
+                    else if (t < 0.66) col.copy(c2).lerp(c3, (t-0.33)*3); 
+                    else col.copy(c3).lerp(c4, (t-0.66)*3);
+                    colors[idx*3] = col.r; colors[idx*3+1] = col.g; colors[idx*3+2] = col.b;
+                }
+            }
+            
+            geo.setAttribute('color', new THREE.BufferAttribute(colors, 3)); 
+            geo.computeVertexNormals(); // Re-calculates how light bounces off the new angles
+            
+            scene.add(mesh); 
+            return mesh;
+        }
         function getTerrainHeight(worldX, worldZ) {
             const s = 0.018;
             let h = simplex.noise2D(worldX * s, worldZ * s) * 12; 
