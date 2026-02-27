@@ -422,7 +422,7 @@ function rollCreditsSequence() {
             container.style.display = 'block';
             
             // NEW: Set a faster delay (15 seconds) for mobile, keep 41 for desktop
-            const revealDelay = isMobile() ? 15000 : 41000;
+            const revealDelay = isMobile() ? 25000 : 41000;
 
             gsap.to(container, { opacity: 1, duration: 4, ease: "power2.inOut" });
             gsap.to(camera.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
@@ -438,25 +438,6 @@ function rollCreditsSequence() {
                 setTimeout(() => { revealPanel(); }, revealDelay);
             }, 3500); 
         }
-        /*
-        function rollCreditsSequence() {
-            if (isPanning) return;
-            isPanning = true;
-            const container = document.getElementById('crawl-container');
-            container.style.display = 'block';
-            gsap.to(container, { opacity: 1, duration: 4, ease: "power2.inOut" });
-            gsap.to(camera.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
-            gsap.to(camera.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
-            gsap.to(starGroup.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
-            gsap.to(starGroup.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
-            gsap.to(mainGroup.position, { y: -500, z: -500, duration: 3, ease: "power3.in" });
-            gsap.to(tileGroup.position, { y: -500, duration: 3, ease: "power3.in" });
-            setTimeout(() => {
-                container.classList.add('crawl-active');
-                setTimeout(() => { revealPanel(); }, 41000);
-            }, 3500); 
-        }
-*/
         
 
         function startTerrainTransition() {
