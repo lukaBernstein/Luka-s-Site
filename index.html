@@ -171,7 +171,7 @@
 
             @keyframes scroll-up-mobile {
                 0% { 
-                    top: 125vh; 
+                    top: 115vh; 
                     transform: translateX(-50%) scale(1); 
                 }
                 100% { 
@@ -498,18 +498,17 @@ function setupScene2() {
             starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
             
             terrainStars = new THREE.Points(starGeo, new THREE.PointsMaterial({ 
-        // ... existing star settings ...
-        depthWrite: false, // Stars don't block terrain
-        depthTest: true    // Terrain blocks stars
-    }));
-    terrainStars.renderOrder = -1; // Force background rendering
-
+                color: 0xffffff,
+                size: 1.8,              // Reduced from previous default to make them sharper
+                sizeAttenuation: false, // Prevents stars from getting huge when close to the camera
+                transparent: true,
+                opacity: 0.,           // Slightly dimming them helps them feel "further away"
+                depthWrite: false, 
+                depthTest: true    
+            }));
             
-            
-            // Set stars to render early so they are "at the back"
             terrainStars.renderOrder = -1; 
             scene.add(terrainStars);
-
     // --- ORB POINT LIGHT ---
     const orbLight = new THREE.PointLight(0xffaa44, 2500, 1200, 1.2); 
     orbLight.position.set(0, 45, -200); 
