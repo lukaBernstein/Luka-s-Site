@@ -88,7 +88,7 @@
         .title h1 { font-size: 6.5rem; margin: 0; letter-spacing: 0.02em; transform: scaleY(1.35); }
 
         @keyframes scroll-up {
-            0% { top: 190vh; }
+            0% { top: 185vh; }
             100% { top: -15000px; }
         }
 
@@ -405,8 +405,8 @@
             gsap.to(tileGroup.position, { y: -500, duration: 3, ease: "power3.in" });
             setTimeout(() => {
                 container.classList.add('crawl-active');
-                setTimeout(() => { revealPanel(); }, 25000);
-            }, 3200); 
+                setTimeout(() => { revealPanel(); }, 41000);
+            }, 3500); 
         }
 
         function startTerrainTransition() {
