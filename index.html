@@ -76,7 +76,7 @@
         }
 
         .crawl-active .crawl-content {
-            animation: scroll-up 160s linear forwards;
+            animation: scroll-up 240s linear forwards;
         }
 
         .title {
@@ -88,7 +88,7 @@
         .title h1 { font-size: 6.5rem; margin: 0; letter-spacing: 0.02em; transform: scaleY(1.35); }
 
         @keyframes scroll-up {
-            0% { top: 175vh; }
+            0% { top: 190vh; }
             100% { top: -15000px; }
         }
 
@@ -107,22 +107,20 @@
                 z-index: 150;
             }
 
-            .crawl-content { 
-                font-size: 1.4rem; 
-                width: 85%; 
-                position: absolute;
-                left: 50%;
-                transform: translateX(-50%); 
-                top: 100vh; 
-                line-height: 1.5; 
-                font-weight: 900;
-                text-align: justify;
-                text-justify: inter-word;
-                letter-spacing: 0.05em; 
-                -webkit-font-smoothing: antialiased;
-                text-shadow: 0 0 3px rgba(254, 218, 74, 0.8); 
-                backface-visibility: hidden;
-            }
+            .crawl-content {
+    position: absolute;
+    top: 200vh;
+    width: 100%;
+    text-align: justify;
+    text-justify: inter-word;
+    font-size: 3.2rem;
+    line-height: 1.15;
+    
+    /* ADD THESE THREE LINES */
+    hyphens: auto;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
 
             .start-button { 
                 font-size: 0.9rem; 
@@ -179,8 +177,7 @@
                         <p>A personal statement from</p>
                         <h1>LUKA BERNSTEIN</h1>
                     </div>
-                    <p>Thank you for visiting my website! I hope you’ve enjoyed it thus far, it took me a very long time to code. It may surprise you how much the computational linear algebra and calculus needed to render 3D objects overlaps with analyzing data in other fields. It’s exactly this intersection between complex analysis and effective communication that defines my approach to problem-solving.</p>
-                    <p>I’m also very passionate about sustainability. In fact even the server on which this website is hosted has been specifically configured to run solely on renewably generated electricity.</p>
+                    <p>Thank you for visiting my website! I hope you’ve enjoyed it thus far, it took me a very long time to code. It may surprise you how much the computational linear algebra and calculus needed to render 3D objects overlaps with analyzing data in other fields. It’s exactly this intersection between complex analysis and effective communication that defines my approach to problem-solving. I’m also very passionate about sustainability. In fact even the server on which this website is hosted has been specifically configured to run solely on renewably generated electricity.</p>
                     <p>On a more personal note, I believe in maintaining a broad perspective, so I apply that same curiosity to a wide range of interests. I love backcountry packing, reading literature, and I have a 2000 blitz chess ELO.</p>
                     <p>So dear viewer, now that you’ve gotten to know me, I’d love to get to know you! Stick around you’ll come upon my “contact me” button…</p>
                     <br><br>
