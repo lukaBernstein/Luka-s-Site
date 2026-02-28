@@ -635,26 +635,31 @@ horizonOrb.name = "interactiveOrb";
         }
 
 function createTerrainTile(tx, tz) {
-    // Add +2 to the size to create a 1-unit overlap on all sides
+    // 1. ADD OVERLAP: We make the plane 2 units larger than TILE_SIZE 
+    // to ensure there are no microscopic gaps between procedural tiles.
     const geo = new THREE.PlaneGeometry(TILE_SIZE + 2, TILE_SIZE + 2, TILE_RES, TILE_RES);
     
+    // 2. FORCED OPAQUE MATERIAL:
     const mat = new THREE.MeshStandardMaterial({ 
         vertexColors: true, 
         flatShading: true, 
         metalness: 0.4, 
         roughness: 0.5,
-        transparent: false, 
-        depthWrite: true,   
-        depthTest: true,    
+        transparent: false, // This is the most important fix for opacity
+        opacity: 1.0, 
+        depthWrite: true,   // Tells the engine this object blocks things behind it
+        depthTest: true,    // Checks if things are behind it
         side: THREE.FrontSide 
     });
     
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.renderOrder = 1; 
-    mesh.rotation.x = -Math.PI / 2;
     
-    const ox = tx * TILE_SIZE;
-    const oz = tz * TILE_SIZE;
+    // 3. RENDER ORDER: Force terrain to render AFTER stars.
+    // This ensures the terrain "overwrites" the star pixels.
+    mesh.renderOrder = 1; 
+
+    mesh.rotation.x = -Math.PI / 2;
+    const ox = tx * TILE_SIZE, oz = tz * TILE_SIZE;
     mesh.position.set(ox, 0, oz);
 
     const pos = geo.attributes.position, colors = new Float32Array(pos.count * 3);
