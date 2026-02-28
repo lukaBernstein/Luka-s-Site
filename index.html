@@ -444,28 +444,30 @@ function downloadResume() {
             gsap.to(innerWire.material, { opacity: 0.5, duration: 1.5, delay: 0.8 });
         }
 function rollCreditsSequence() {
-            if (isPanning) return;
-            isPanning = true;
-            const container = document.getElementById('crawl-container');
-            container.style.display = 'block';
-            
-            // NEW: Set a faster delay (15 seconds) for mobile, keep 41 for desktop
-            const revealDelay = isMobile() ? 40000 : 43000;
+    if (isPanning) return;
+    isPanning = true;
+    const container = document.getElementById('crawl-container');
+    container.style.display = 'block';
+    
+    // Unified delay for all mobile browsers (12 seconds) 
+    // This is the time it takes for the text to clear the screen 
+    // before the "SHOW ME..." button appears.
+    const revealDelay = isMobile() ? 12000 : 43000;
 
-            gsap.to(container, { opacity: 1, duration: 4, ease: "power2.inOut" });
-            gsap.to(camera.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
-            gsap.to(camera.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
-            gsap.to(starGroup.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
-            gsap.to(starGroup.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
-            gsap.to(mainGroup.position, { y: -500, z: -500, duration: 3, ease: "power3.in" });
-            gsap.to(tileGroup.position, { y: -500, duration: 3, ease: "power3.in" });
-            
-            setTimeout(() => {
-                container.classList.add('crawl-active');
-                // Use the new revealDelay variable here
-                setTimeout(() => { revealPanel(); }, revealDelay);
-            }, 3500); 
-        }
+    gsap.to(container, { opacity: 1, duration: 4, ease: "power2.inOut" });
+    gsap.to(camera.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
+    gsap.to(camera.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
+    gsap.to(starGroup.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
+    gsap.to(starGroup.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
+    gsap.to(mainGroup.position, { y: -500, z: -500, duration: 3, ease: "power3.in" });
+    gsap.to(tileGroup.position, { y: -500, duration: 3, ease: "power3.in" });
+    
+    setTimeout(() => {
+        container.classList.add('crawl-active');
+        // Triggers the final button reveal
+        setTimeout(() => { revealPanel(); }, revealDelay);
+    }, 3500); 
+}
         
 
 function startTerrainTransition() {
