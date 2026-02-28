@@ -475,17 +475,21 @@ function startTerrainTransition() {
     gsap.to([outerWire.material, panelTextMesh.material], { opacity: 0, duration: 1.0 });
     gsap.to(panelGroup.position, { z: -50, duration: 1.5, ease: "power2.in" });
     
-gsap.to(overlay, { 
+    gsap.to(overlay, { 
         opacity: 1, 
         duration: 1.5, 
         onComplete: () => {
-            // ... cleanup code ...
+            scene.remove(mainGroup, starGroup, tileGroup, namePlane, glowPlane, nameLight, sweepLight);
+            camera.remove(panelGroup); 
+            document.getElementById('crawl-container').style.display = 'none';
+            
             setupScene2(); 
             
-            // INCREASED FOG DENSITY: 
-            // 0.012 is usually the sweet spot to hide the edge of a 3x3 grid
+            gsap.to(overlay, { opacity: 0, duration: 2, delay: 0.5 });
+            
+            // 1. Fog Reveal (3.5s)
             gsap.to(scene.fog, { 
-                density: 0.012, 
+                density: 0.007, 
                 duration: 3.5, 
                 ease: "sine.inOut" 
             });
@@ -631,33 +635,28 @@ horizonOrb.name = "interactiveOrb";
         }
 
 function createTerrainTile(tx, tz) {
-    const geo = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE, TILE_RES, TILE_RES);
+    // Add +2 to the size to create a 1-unit overlap on all sides
+    const geo = new THREE.PlaneGeometry(TILE_SIZE + 2, TILE_SIZE + 2, TILE_RES, TILE_RES);
     
-    // 1. FORCED OPAQUE MATERIAL
     const mat = new THREE.MeshStandardMaterial({ 
         vertexColors: true, 
         flatShading: true, 
         metalness: 0.4, 
         roughness: 0.5,
-        transparent: false, // Disables alpha blending entirely
-        opacity: 1.0,       // Ensures full color density
-        depthWrite: true,   // Crucial: tells Three.js to record the "depth" of the mountain
-        depthTest: true,    // Checks if things (like stars) are behind it
+        transparent: false, 
+        depthWrite: true,   
+        depthTest: true,    
         side: THREE.FrontSide 
     });
     
     const mesh = new THREE.Mesh(geo, mat);
-    
-    // 2. RENDER ORDER LOGIC
-    // We set this to 1 so it renders AFTER the background stars (which should be 0 or -1).
-    // This allows the "solid" terrain to overdraw and hide the stars.
     mesh.renderOrder = 1; 
-
     mesh.rotation.x = -Math.PI / 2;
-    const ox = tx * TILE_SIZE, oz = tz * TILE_SIZE;
+    
+    const ox = tx * TILE_SIZE;
+    const oz = tz * TILE_SIZE;
     mesh.position.set(ox, 0, oz);
 
-    // ... (rest of your existing vertex height and color logic)
     const pos = geo.attributes.position, colors = new Float32Array(pos.count * 3);
     const c1 = new THREE.Color(0x2a0505), c2 = new THREE.Color(0x990000), c3 = new THREE.Color(0xff2200), c4 = new THREE.Color(0xffcccc);
 
