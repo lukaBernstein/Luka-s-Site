@@ -863,21 +863,12 @@ function onClick(event) {
     if (isTerrainMode) {
         const intersects = raycaster.intersectObjects(camera.children, true);
         const orbHit = intersects.find(hit => hit.object.name === "interactiveOrb");
-       if (orbHit) {
-            const email = "bernsteinluka@gmail.com";
-            
-            // Attempt to open the mail app
-            window.location.href = `mailto:${email}?subject=Hello from your website!`;
-
-            // Copy to Clipboard Fallback
-            navigator.clipboard.writeText(email).then(() => {
-                alert("Email address copied to clipboard! (Since no mail app was detected)");
-            }).catch(err => {
-                console.error("Could not copy email: ", err);
-            });
-            
+        if (orbHit) {
+            // Replace with your actual email
+            window.location.href = "mailto:bernsteinluka@gmail.com?subject=Hello from your website!"; 
             return;
         }
+    }
 
     if (panelReady) {
         if (raycaster.intersectObjects(panelGroup.children).length > 0) { startTerrainTransition(); return; }
