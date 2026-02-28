@@ -475,21 +475,17 @@ function startTerrainTransition() {
     gsap.to([outerWire.material, panelTextMesh.material], { opacity: 0, duration: 1.0 });
     gsap.to(panelGroup.position, { z: -50, duration: 1.5, ease: "power2.in" });
     
-    gsap.to(overlay, { 
+gsap.to(overlay, { 
         opacity: 1, 
         duration: 1.5, 
         onComplete: () => {
-            scene.remove(mainGroup, starGroup, tileGroup, namePlane, glowPlane, nameLight, sweepLight);
-            camera.remove(panelGroup); 
-            document.getElementById('crawl-container').style.display = 'none';
-            
+            // ... cleanup code ...
             setupScene2(); 
             
-            gsap.to(overlay, { opacity: 0, duration: 2, delay: 0.5 });
-            
-            // 1. Fog Reveal (3.5s)
+            // INCREASED FOG DENSITY: 
+            // 0.012 is usually the sweet spot to hide the edge of a 3x3 grid
             gsap.to(scene.fog, { 
-                density: 0.007, 
+                density: 0.012, 
                 duration: 3.5, 
                 ease: "sine.inOut" 
             });
