@@ -635,27 +635,24 @@ horizonOrb.name = "interactiveOrb";
         }
 
 function createTerrainTile(tx, tz) {
-    // 1. ADD OVERLAP: We make the plane 2 units larger than TILE_SIZE 
-    // to ensure there are no microscopic gaps between procedural tiles.
-    const geo = new THREE.PlaneGeometry(TILE_SIZE + 2, TILE_SIZE + 2, TILE_RES, TILE_RES);
+    const geo = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE, TILE_RES, TILE_RES);
     
-    // 2. FORCED OPAQUE MATERIAL:
+    // UPDATED MATERIAL: Forced Opaque and Depth-Solid
     const mat = new THREE.MeshStandardMaterial({ 
         vertexColors: true, 
         flatShading: true, 
         metalness: 0.4, 
         roughness: 0.5,
-        transparent: false, // This is the most important fix for opacity
-        opacity: 1.0, 
-        depthWrite: true,   // Tells the engine this object blocks things behind it
-        depthTest: true,    // Checks if things are behind it
-        side: THREE.FrontSide 
+        transparent: false, // Ensures the mountain is a solid occluder
+        depthWrite: true,   // Records the mountain's position in the depth buffer
+        depthTest: true,    // Checks depth against other objects like stars
+        side: THREE.FrontSide // Only render the visible side to keep depth data clean
     });
     
     const mesh = new THREE.Mesh(geo, mat);
     
-    // 3. RENDER ORDER: Force terrain to render AFTER stars.
-    // This ensures the terrain "overwrites" the star pixels.
+    // RENDER ORDER: Force the terrain to render AFTER the stars 
+    // This allows the terrain to "overpaint" and block the stars
     mesh.renderOrder = 1; 
 
     mesh.rotation.x = -Math.PI / 2;
@@ -1058,7 +1055,7 @@ orbs.forEach(o => {
                 });
 
                 if (artifact.visible) {
-                    artifact.rotation.y += 0.002 + mouse.x * 0.01;
+                    artifact.rotation.y += 0.009 + mouse.x * 0.09;
                     artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 0.4, 0.05);
                 }
             }
