@@ -129,26 +129,25 @@
                 z-index: 150;
             }
 
-.crawl-content {
-    position: absolute;
-    /* 1. Set top to 0 so the browser stops doing layout math */
-    top: 0; 
-    left: 50%; 
-    width: 90%; 
-    
-    text-align: justify;
-    text-justify: inter-word;
-    font-size: 2.2rem; 
-    line-height: 1.25;
-    hyphens: auto;
-    word-break: break-word;
-    overflow-wrap: break-word;
-    
-    /* 2. Force hardware acceleration in Chrome */
-    will-change: transform;
-    /* 3. Set the default state using translate3d */
-    transform: translate3d(-50%, 500px, 0) scale(1);
-}
+           .crawl-content {
+                position: absolute;
+                top: 200vh;
+                left: 50%; /* This is required to keep it centered */
+                width: 90%; 
+                
+                /* Text Alignment */
+                text-align: justify;
+                text-justify: inter-word;
+                
+                /* Increased Font Size */
+                font-size: 2.2rem; /* Adjusted from 1.6rem to be bigger */
+                line-height: 1.25;
+                
+                /* Spacing Fixes */
+                hyphens: auto;
+                word-break: break-word;
+                overflow-wrap: break-word;
+            }
             .start-button { 
                 font-size: 0.9rem; 
                 padding: 10px 20px; 
@@ -176,16 +175,16 @@
                 animation: scroll-up-mobile 200s linear forwards;
             }
 
-@keyframes scroll-up-mobile {
-    0% { 
-        /* 4. Start the Y position at 500px (adjust this number if you want it to start lower/higher) */
-        transform: translate3d(-50%, 1000px, 0) scale(1); 
-    }
-    100% { 
-        /* Move it 15000px up the plane */
-        transform: translate3d(-50%, -15000px, 0) scale(0.4); 
-    }
-}
+            @keyframes scroll-up-mobile {
+                0% { 
+                    top: 95vh; 
+                    transform: translateX(-50%) scale(1); 
+                }
+                100% { 
+                    top: -15000px; 
+                    transform: translateX(-50%) scale(0.4); 
+                }
+            }
 
             button#start-button, .start-button, button { 
                 font-size: 0.85rem !important; 
@@ -445,30 +444,28 @@ function downloadResume() {
             gsap.to(innerWire.material, { opacity: 0.5, duration: 1.5, delay: 0.8 });
         }
 function rollCreditsSequence() {
-    if (isPanning) return;
-    isPanning = true;
-    const container = document.getElementById('crawl-container');
-    container.style.display = 'block';
-    
-    // Unified delay for all mobile browsers (12 seconds) 
-    // This is the time it takes for the text to clear the screen 
-    // before the "SHOW ME..." button appears.
-    const revealDelay = isMobile() ? 12000 : 43000;
+            if (isPanning) return;
+            isPanning = true;
+            const container = document.getElementById('crawl-container');
+            container.style.display = 'block';
+            
+            // NEW: Set a faster delay (15 seconds) for mobile, keep 41 for desktop
+            const revealDelay = isMobile() ? 40000 : 43000;
 
-    gsap.to(container, { opacity: 1, duration: 4, ease: "power2.inOut" });
-    gsap.to(camera.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
-    gsap.to(camera.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
-    gsap.to(starGroup.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
-    gsap.to(starGroup.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
-    gsap.to(mainGroup.position, { y: -500, z: -500, duration: 3, ease: "power3.in" });
-    gsap.to(tileGroup.position, { y: -500, duration: 3, ease: "power3.in" });
-    
-    setTimeout(() => {
-        container.classList.add('crawl-active');
-        // Triggers the final button reveal
-        setTimeout(() => { revealPanel(); }, revealDelay);
-    }, 3500); 
-}
+            gsap.to(container, { opacity: 1, duration: 4, ease: "power2.inOut" });
+            gsap.to(camera.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
+            gsap.to(camera.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
+            gsap.to(starGroup.position, { x: 300, y: 150, z: 200, duration: 2.5, ease: "power3.inOut" });
+            gsap.to(starGroup.rotation, { x: -1.2, y: 1.5, z: 0.5, duration: 2.5, ease: "power3.inOut" });
+            gsap.to(mainGroup.position, { y: -500, z: -500, duration: 3, ease: "power3.in" });
+            gsap.to(tileGroup.position, { y: -500, duration: 3, ease: "power3.in" });
+            
+            setTimeout(() => {
+                container.classList.add('crawl-active');
+                // Use the new revealDelay variable here
+                setTimeout(() => { revealPanel(); }, revealDelay);
+            }, 3500); 
+        }
         
 
 function startTerrainTransition() {
@@ -522,9 +519,12 @@ function startTerrainTransition() {
 }
 
 function setupScene2() {
-    isTerrainMode = true; 
-    scene.background = new THREE.Color(VOID_PURPLE); 
-    scene.fog = new THREE.FogExp2(VOID_PURPLE, 0.1);
+            isTerrainMode = true; 
+            scene.background = new THREE.Color(VOID_PURPLE); 
+            
+            // Start with a thicker fog (0.15 or 0.2) so the terrain is hidden 
+            // behind a wall of purple initially
+            scene.fog = new THREE.FogExp2(VOID_PURPLE, 0.1);
     
     const height = isMobile() ? 35 : 21.8;
     camera.position.set(0, height, 0);
@@ -532,35 +532,36 @@ function setupScene2() {
     camera.fov = isMobile() ? 95 : 85;
     camera.updateProjectionMatrix();
 
-    const starGeo = new THREE.BufferGeometry();
-    const starCount = 150000;
-    const posArray = new Float32Array(starCount * 3);
-    for (let i = 0; i < starCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 3500;
-    starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-    
-    terrainStars = new THREE.Points(starGeo, new THREE.PointsMaterial({ 
-        color: 0xffffff,
-        size: 1.8,
-        sizeAttenuation: false,
-        transparent: true,
-        opacity: 0.9,
-        depthWrite: false, 
-        depthTest: true    
-    }));
-    
-    terrainStars.renderOrder = -1; 
-    scene.add(terrainStars);
-
-    const orbLight = new THREE.PointLight(0xffaa44, 0, 1200, 1.2); 
-    orbLight.name = "horizonLight"; // Important for the GSAP fade in startTerrainTransition
+    // --- UPDATED STARS ---
+            const starGeo = new THREE.BufferGeometry();
+            const starCount = 150000;
+            const posArray = new Float32Array(starCount * 3);
+            for (let i = 0; i < starCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 3500;
+            starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            
+            terrainStars = new THREE.Points(starGeo, new THREE.PointsMaterial({ 
+                color: 0xffffff,
+                size: 1.8,              // Reduced from previous default to make them sharper
+                sizeAttenuation: false, // Prevents stars from getting huge when close to the camera
+                transparent: true,
+                opacity: 9.,           // Slightly dimming them helps them feel "further away"
+                depthWrite: false, 
+                depthTest: true    
+            }));
+            
+            terrainStars.renderOrder = -1; 
+            scene.add(terrainStars);
+    // --- ORB POINT LIGHT ---
+    const orbLight = new THREE.PointLight(0xffaa44, 2500, 1200, 1.2); 
     orbLight.position.set(0, 45, -200); 
     camera.add(orbLight);
 
+    // --- DYNAMIC PLASMA SHADER ORB ---
+    // --- DYNAMIC PLASMA SHADER ORB (FIXED EDGES) ---
     const orbShaderVars = {
         time: { value: 0 },
-        uOpacity: { value: 0 }, // Initialized at 0 for fade-in
-        color1: { value: new THREE.Color(0xffffff) }, 
-        color2: { value: new THREE.Color(0xffaa00) }  
+        color1: { value: new THREE.Color(0xffffff) }, // Core
+        color2: { value: new THREE.Color(0xffaa00) }  // Outer glow
     };
 
     orbShaderMat = new THREE.ShaderMaterial({
@@ -578,10 +579,10 @@ function setupScene2() {
         fragmentShader: `
             varying vec2 vUv;
             uniform float time;
-            uniform float uOpacity;
             uniform vec3 color1;
             uniform vec3 color2;
 
+            // Better noise for plasma texture
             float noise(vec2 p) {
                 return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
             }
@@ -589,23 +590,36 @@ function setupScene2() {
             void main() {
                 vec2 uv = vUv - 0.5;
                 float dist = length(uv);
+                
+                // 1. RADIAL MASK: This is the fix. 
+                // It ensures alpha hits 0 before reaching the square edges.
                 float mask = smoothstep(0.5, 0.35, dist);
+                
+                // 2. CORONA EFFECT: Swirling plasma waves
                 float angle = atan(uv.y, uv.x);
                 float pulse = sin(dist * 15.0 - time * 3.0 + sin(angle * 5.0 + time)) * 0.1;
+                
+                // 3. CORE & GLOW
                 float core = smoothstep(0.2, 0.0, dist);
                 float glow = smoothstep(0.45, 0.1, dist + pulse);
+                
+                // Mixing colors based on intensity
                 vec3 finalColor = mix(color2, color1, core + 0.2);
+                
+                // Add high-frequency shimmer
                 float shimmer = 0.8 + 0.2 * noise(uv + time * 0.1);
-                gl_FragColor = vec4(finalColor * shimmer, (glow + core) * mask * uOpacity);
+                
+                // Combine everything with the radial mask to kill the square edges
+                gl_FragColor = vec4(finalColor * shimmer, (glow + core) * mask);
             }
         `
     });
-
     const orbGeo = new THREE.PlaneGeometry(1, 1);
     const horizonOrb = new THREE.Mesh(orbGeo, orbShaderMat);
     horizonOrb.scale.set(180, 180, 1);
     horizonOrb.renderOrder = 999;
-    horizonOrb.name = "interactiveOrb";
+
+horizonOrb.name = "interactiveOrb";
     
     const orbGroup = new THREE.Group();
     orbGroup.position.set(0, 75, -200); 
@@ -623,28 +637,31 @@ function setupScene2() {
 function createTerrainTile(tx, tz) {
     const geo = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE, TILE_RES, TILE_RES);
     
-    // UPDATED MATERIAL: Forced Opaque and Depth-Solid
+    // 1. FORCED OPAQUE MATERIAL
     const mat = new THREE.MeshStandardMaterial({ 
         vertexColors: true, 
         flatShading: true, 
         metalness: 0.4, 
         roughness: 0.5,
-        transparent: false, // Ensures the mountain is a solid occluder
-        depthWrite: true,   // Records the mountain's position in the depth buffer
-        depthTest: true,    // Checks depth against other objects like stars
-        side: THREE.FrontSide // Only render the visible side to keep depth data clean
+        transparent: false, // Disables alpha blending entirely
+        opacity: 1.0,       // Ensures full color density
+        depthWrite: true,   // Crucial: tells Three.js to record the "depth" of the mountain
+        depthTest: true,    // Checks if things (like stars) are behind it
+        side: THREE.FrontSide 
     });
     
     const mesh = new THREE.Mesh(geo, mat);
     
-    // RENDER ORDER: Force the terrain to render AFTER the stars 
-    // This allows the terrain to "overpaint" and block the stars
+    // 2. RENDER ORDER LOGIC
+    // We set this to 1 so it renders AFTER the background stars (which should be 0 or -1).
+    // This allows the "solid" terrain to overdraw and hide the stars.
     mesh.renderOrder = 1; 
 
     mesh.rotation.x = -Math.PI / 2;
     const ox = tx * TILE_SIZE, oz = tz * TILE_SIZE;
     mesh.position.set(ox, 0, oz);
 
+    // ... (rest of your existing vertex height and color logic)
     const pos = geo.attributes.position, colors = new Float32Array(pos.count * 3);
     const c1 = new THREE.Color(0x2a0505), c2 = new THREE.Color(0x990000), c3 = new THREE.Color(0xff2200), c4 = new THREE.Color(0xffcccc);
 
@@ -831,20 +848,18 @@ configs.forEach((cfg, i) => {
         }
 
 function onClick(event) {
-    // 1. SAFARI MOBILE COORDINATE FIX: Get coordinates for both touch and pointer
-    const clientX = event.clientX || (event.touches && event.touches[0] ? event.touches[0].clientX : 0);
-    const clientY = event.clientY || (event.touches && event.touches[0] ? event.touches[0].clientY : 0);
-    
-    mouse.x = (clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+    // FIX FOR SAFARI MOBILE: Update coordinates immediately on tap/click
+    if (event && event.clientX !== undefined) {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    }
 
+    // Standardize the event to prevent issues on different browsers
     if (event && event.preventDefault) event.preventDefault();
 
-    // 2. MATRIX UPDATE: Ensures the raycaster knows exactly where the orb is while moving
-    camera.updateMatrixWorld();
     raycaster.setFromCamera(mouse, camera);
 
-    if (isTerrainMode) {
+if (isTerrainMode) {
         const intersects = raycaster.intersectObjects(camera.children, true);
         const orbHit = intersects.find(hit => hit.object.name === "interactiveOrb");
         
@@ -852,13 +867,10 @@ function onClick(event) {
             const email = "bernsteinluka@gmail.com";
             const subject = encodeURIComponent("Hello from your website!");
             
-            // 3. SAFARI POP-UP FIX: Use mailto for mobile, Gmail tab for desktop
-            if (isMobile()) {
-                window.location.href = `mailto:${email}?subject=${subject}`;
-            } else {
-                const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}`;
-                window.open(gmailUrl, '_blank'); 
-            }
+            // This specific URL forces Gmail to open a "Compose" window in a new tab
+            const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}`;
+            
+            window.open(gmailUrl, '_blank'); 
             return;
         }
     }
@@ -869,9 +881,11 @@ function onClick(event) {
 
     if (isSpelling) {
         if (raycaster.intersectObjects([nebula, buttonBox], true).length > 0) {
+            // Check the flag here: if it's the first time, download. If already clicked, roll credits.
             if (!isCredits) {
                 downloadResume();
             } else if (!isDownloading) {
+                // We only roll credits if we aren't currently in the middle of a download lock
                 rollCreditsSequence();
             }
             return;
