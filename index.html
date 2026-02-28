@@ -175,16 +175,16 @@
                 animation: scroll-up-mobile 200s linear forwards;
             }
 
-            @keyframes scroll-up-mobile {
-                0% { 
-                    top: 90vh; 
-                    transform: translateX(-50%) scale(1); 
-                }
-                100% { 
-                    top: -15000px; 
-                    transform: translateX(-50%) scale(0.4); 
-                }
-            }
+        @keyframes scroll-up-mobile {
+    0% { 
+        top: 100vh; /* Changed from 79vh to 100vh for cross-browser consistency */
+        transform: translateX(-50%) scale(1); 
+    }
+    100% { 
+        top: -15000px; 
+        transform: translateX(-50%) scale(0.4); 
+    }
+}
 
             button#start-button, .start-button, button { 
                 font-size: 0.85rem !important; 
