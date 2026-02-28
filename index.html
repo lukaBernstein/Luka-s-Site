@@ -1055,7 +1055,7 @@ orbs.forEach(o => {
                 });
 
                 if (artifact.visible) {
-                    artifact.rotation.y += 0.009 + mouse.x * 0.09;
+                    artifact.rotation.y += 0.1 + mouse.x * 0.1;
                     artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 0.4, 0.05);
                 }
             }
