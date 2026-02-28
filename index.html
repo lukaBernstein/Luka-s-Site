@@ -1054,10 +1054,14 @@ orbs.forEach(o => {
                     if (s.position.z > 50) { resetStar(s); if (isWarping) s.position.z = -4000; }
                 });
 
-                if (artifact.visible) {
-                    artifact.rotation.y += 0.1 + mouse.x * 0.1;
-                    artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 0.4, 0.05);
-                }
+              if (artifact.visible) {
+    // 1. Increase the constant spin and mouse sensitivity on the Y axis
+    artifact.rotation.y += 0.005 + mouse.x * 0.08; 
+    
+    // 2. Increase the vertical tilt (X axis) multiplier from 0.4 to 1.2
+    // This makes the 'peek' at the top/bottom of the shape much deeper
+    artifact.rotation.x = THREE.MathUtils.lerp(artifact.rotation.x, -mouse.y * 1.2, 0.08);
+}
             }
             renderer.render(scene, camera);
         }
