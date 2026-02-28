@@ -131,9 +131,11 @@
 
 .crawl-content {
     position: absolute;
-    top: 900px; /* CHANGED: Fixed pixel value instead of vh */
-    left: 50%;
+    /* 1. Set top to 0 so the browser stops doing layout math */
+    top: 0; 
+    left: 50%; 
     width: 90%; 
+    
     text-align: justify;
     text-justify: inter-word;
     font-size: 2.2rem; 
@@ -141,6 +143,11 @@
     hyphens: auto;
     word-break: break-word;
     overflow-wrap: break-word;
+    
+    /* 2. Force hardware acceleration in Chrome */
+    will-change: transform;
+    /* 3. Set the default state using translate3d */
+    transform: translate3d(-50%, 500px, 0) scale(1);
 }
             .start-button { 
                 font-size: 0.9rem; 
@@ -171,12 +178,12 @@
 
 @keyframes scroll-up-mobile {
     0% { 
-        top: 900px; /* CHANGED: Fixed pixel value */
-        transform: translateX(-50%) scale(1); 
+        /* 4. Start the Y position at 500px (adjust this number if you want it to start lower/higher) */
+        transform: translate3d(-50%, 500px, 0) scale(1); 
     }
     100% { 
-        top: -15000px; 
-        transform: translateX(-50%) scale(0.4); 
+        /* Move it 15000px up the plane */
+        transform: translate3d(-50%, -15000px, 0) scale(0.4); 
     }
 }
 
