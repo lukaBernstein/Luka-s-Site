@@ -129,25 +129,19 @@
                 z-index: 150;
             }
 
-           .crawl-content {
-                position: absolute;
-                top: 200vh;
-                left: 50%; /* This is required to keep it centered */
-                width: 90%; 
-                
-                /* Text Alignment */
-                text-align: justify;
-                text-justify: inter-word;
-                
-                /* Increased Font Size */
-                font-size: 2.2rem; /* Adjusted from 1.6rem to be bigger */
-                line-height: 1.25;
-                
-                /* Spacing Fixes */
-                hyphens: auto;
-                word-break: break-word;
-                overflow-wrap: break-word;
-            }
+.crawl-content {
+    position: absolute;
+    top: 900px; /* CHANGED: Fixed pixel value instead of vh */
+    left: 50%;
+    width: 90%; 
+    text-align: justify;
+    text-justify: inter-word;
+    font-size: 2.2rem; 
+    line-height: 1.25;
+    hyphens: auto;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
             .start-button { 
                 font-size: 0.9rem; 
                 padding: 10px 20px; 
@@ -175,9 +169,9 @@
                 animation: scroll-up-mobile 200s linear forwards;
             }
 
-        @keyframes scroll-up-mobile {
+@keyframes scroll-up-mobile {
     0% { 
-        top: 100vh; /* Changed from 79vh to 100vh for cross-browser consistency */
+        top: 900px; /* CHANGED: Fixed pixel value */
         transform: translateX(-50%) scale(1); 
     }
     100% { 
