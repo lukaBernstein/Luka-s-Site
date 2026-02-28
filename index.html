@@ -845,18 +845,20 @@ configs.forEach((cfg, i) => {
         }
 
 function onClick(event) {
-    // FIX FOR SAFARI MOBILE: Update coordinates immediately on tap/click
-    if (event && event.clientX !== undefined) {
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    }
+    // 1. SAFARI MOBILE COORDINATE FIX: Get coordinates for both touch and pointer
+    const clientX = event.clientX || (event.touches && event.touches[0] ? event.touches[0].clientX : 0);
+    const clientY = event.clientY || (event.touches && event.touches[0] ? event.touches[0].clientY : 0);
+    
+    mouse.x = (clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(clientY / window.innerHeight) * 2 + 1;
 
-    // Standardize the event to prevent issues on different browsers
     if (event && event.preventDefault) event.preventDefault();
 
+    // 2. MATRIX UPDATE: Ensures the raycaster knows exactly where the orb is while moving
+    camera.updateMatrixWorld();
     raycaster.setFromCamera(mouse, camera);
 
-if (isTerrainMode) {
+    if (isTerrainMode) {
         const intersects = raycaster.intersectObjects(camera.children, true);
         const orbHit = intersects.find(hit => hit.object.name === "interactiveOrb");
         
@@ -864,10 +866,13 @@ if (isTerrainMode) {
             const email = "bernsteinluka@gmail.com";
             const subject = encodeURIComponent("Hello from your website!");
             
-            // This specific URL forces Gmail to open a "Compose" window in a new tab
-            const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}`;
-            
-            window.open(gmailUrl, '_blank'); 
+            // 3. SAFARI POP-UP FIX: Use mailto for mobile, Gmail tab for desktop
+            if (isMobile()) {
+                window.location.href = `mailto:${email}?subject=${subject}`;
+            } else {
+                const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}`;
+                window.open(gmailUrl, '_blank'); 
+            }
             return;
         }
     }
@@ -878,11 +883,9 @@ if (isTerrainMode) {
 
     if (isSpelling) {
         if (raycaster.intersectObjects([nebula, buttonBox], true).length > 0) {
-            // Check the flag here: if it's the first time, download. If already clicked, roll credits.
             if (!isCredits) {
                 downloadResume();
             } else if (!isDownloading) {
-                // We only roll credits if we aren't currently in the middle of a download lock
                 rollCreditsSequence();
             }
             return;
