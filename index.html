@@ -777,6 +777,10 @@
             
             window.addEventListener('pointerdown', onClick);
             window.addEventListener('resize', onResize);
+
+            // Add both click and touchstart
+window.addEventListener('click', onClick);
+window.addEventListener('touchstart', onClick, { passive: false });
             
             if (isMobile()) {
                 const mobileScale = window.innerWidth / 768; 
@@ -877,62 +881,95 @@
             gsap.to(nebula.material, { opacity: 1, duration: 1 }); 
         }
 
-        function onClick(event) {
-            startAudio(); // Start sound on first click
+function onClick(event) {
+    // 1. START AUDIO & RESET TIMER
+    if (typeof startAudio === "function") startAudio(); 
+    if (typeof resetIdleTimer === "function") resetIdleTimer();
 
-            // FIX FOR SAFARI MOBILE: Update coordinates immediately on tap/click
-            if (event && event.clientX !== undefined) {
-                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    // 2. SAFARI MOBILE COORDINATE FIX
+    // Check for touch coordinates first, then fallback to mouse click coordinates
+    let clientX, clientY;
+    if (event.touches && event.touches.length > 0) {
+        clientX = event.touches[0].clientX;
+        clientY = event.touches[0].clientY;
+    } else {
+        clientX = event.clientX;
+        clientY = event.clientY;
+    }
+
+    // Only update if we actually have coordinates
+    if (clientX !== undefined) {
+        mouse.x = (clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+    }
+
+    if (event && event.preventDefault) event.preventDefault();
+
+    // 3. UPDATE CAMERA MATRIX (Crucial for mobile orb tracking)
+    camera.updateMatrixWorld();
+    raycaster.setFromCamera(mouse, camera);
+
+    // 4. TERRAIN MODE / EMAIL ORB LOGIC
+    if (isTerrainMode) {
+        const intersects = raycaster.intersectObjects(camera.children, true);
+        const orbHit = intersects.find(hit => hit.object.name === "interactiveOrb");
+        
+        if (orbHit) {
+            const email = "bernsteinluka@gmail.com";
+            const subject = encodeURIComponent("Hello from your website!");
+            
+            // CHECK FOR MOBILE (Safari Fix)
+            const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            
+            if (isMobileDevice) {
+                // Safari Mobile requires this for mailto links to work
+                window.location.href = `mailto:${email}?subject=${subject}`;
+            } else {
+                // Desktop can still use the fancy Gmail tab
+                const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}`;
+                window.open(gmailUrl, '_blank'); 
             }
-
-            // Standardize the event to prevent issues on different browsers
-            if (event && event.preventDefault) event.preventDefault();
-
-            resetIdleTimer(); // A real click resets the 15-second clock
-
-            raycaster.setFromCamera(mouse, camera);
-
-            if (isTerrainMode) {
-                const intersects = raycaster.intersectObjects(camera.children, true);
-                const orbHit = intersects.find(hit => hit.object.name === "interactiveOrb");
-                
-                if (orbHit) {
-                    const email = "bernsteinluka@gmail.com";
-                    const subject = encodeURIComponent("Hello from your website!");
-                    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}`;
-                    window.open(gmailUrl, '_blank'); 
-                    return;
-                }
-            }
-
-            if (panelReady) {
-                if (raycaster.intersectObjects(panelGroup.children).length > 0) { startTerrainTransition(); return; }
-            }
-
-            if (isSpelling) {
-                if (raycaster.intersectObjects([nebula, buttonBox], true).length > 0) {
-                    if (!isCredits) {
-                        downloadResume();
-                    } else if (!isDownloading) {
-                        rollCreditsSequence();
-                    }
-                    return;
-                }
-            }
-
-            if (arrived && !isUnfolded) {
-                if (raycaster.intersectObjects(artifact.children, true).length > 0) { executeUnfold(); return; }
-            }
-
-            if (isUnfolded && !isSpelling) {
-                if (raycaster.intersectObjects(artifact.children, true).length > 0) { executeSpell(); return; }
-            }
-
-            if (!isWarping && raycaster.intersectObject(namePlane).length > 0) {
-                executeWarp();
-            }
+            return;
         }
+    }
+
+    // 5. REMAINING SITE LOGIC
+    if (panelReady) {
+        if (raycaster.intersectObjects(panelGroup.children).length > 0) { 
+            startTerrainTransition(); 
+            return; 
+        }
+    }
+
+    if (isSpelling) {
+        if (raycaster.intersectObjects([nebula, buttonBox], true).length > 0) {
+            if (!isCredits) {
+                downloadResume();
+            } else if (!isDownloading) {
+                rollCreditsSequence();
+            }
+            return;
+        }
+    }
+
+    if (arrived && !isUnfolded) {
+        if (raycaster.intersectObjects(artifact.children, true).length > 0) { 
+            executeUnfold(); 
+            return; 
+        }
+    }
+
+    if (isUnfolded && !isSpelling) {
+        if (raycaster.intersectObjects(artifact.children, true).length > 0) { 
+            executeSpell(); 
+            return; 
+        }
+    }
+
+    if (!isWarping && raycaster.intersectObject(namePlane).length > 0) {
+        executeWarp();
+    }
+}
 
         function animate() {
             requestAnimationFrame(animate);
