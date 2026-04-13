@@ -37,10 +37,19 @@
 
         /* UI Layer */
         #ui {
-            position: absolute; bottom: 30px; width: 100%; text-align: center;
-            color: #5c4b3d; pointer-events: none; text-shadow: 1px 1px #ffdab9;
-            letter-spacing: 2px; font-family: 'Courier New', monospace; font-weight: bold;
-            opacity: 0; z-index: 10; transition: opacity 2s ease-in-out;
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white; /* Plain white text */
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            letter-spacing: 2px;
+            pointer-events: none;
+            transition: opacity 2s;
+            opacity: 0;
+            text-align: center;
+            z-index: 100;
         }
     </style>
 </head>
@@ -52,7 +61,7 @@
         <canvas id="ascii-canvas"></canvas>
     </div>
 
-    <div id="ui">WASD TO MOVE | CLICK TO LOOK</div>
+    <div id="ui">WASD TO MOVE</div>
 
     <script type="importmap">
         {
@@ -77,7 +86,7 @@
         let currentRotation = 0, colorPhase = 0;
 
         let isFalling = false;
-        let fallOffsets, fallVelocities, fallDelays;
+        let fallOffsets, fallVelocities, fallDelays, fallJitter;
         window.worldActive = false; 
 
         function resize() {
@@ -92,9 +101,12 @@
             fallOffsets = new Float32Array(cols * rows);
             fallVelocities = new Float32Array(cols * rows);
             fallDelays = new Float32Array(cols * rows);
+            fallJitter = new Float32Array(cols * rows);
 
             for(let i = 0; i < cols * rows; i++) {
-                fallDelays[i] = Math.random() * 45; 
+                // Wide range of delays creates the "crumbling" stagger
+                fallDelays[i] = Math.random() * 80; 
+                fallJitter[i] = (Math.random() - 0.5) * 4;
             }
             
             const mCanvas = document.createElement('canvas');
@@ -117,12 +129,10 @@
             mouse.vy = mouse.y - mouse.lastY;
         });
 
-canvas.addEventListener('click', () => {
+        canvas.addEventListener('click', () => {
             if (!isFalling) {
-                // 1. Lock the camera IMMEDIATELY using the current click gesture
                 if (window.lockCamera) window.lockCamera();
 
-                // 2. Start the wavy-to-falling logic
                 const time = Date.now() * 0.0003;
                 for (let y = 0; y < rows; y++) {
                     for (let x = 0; x < cols; x++) {
@@ -131,14 +141,15 @@ canvas.addEventListener('click', () => {
                         const offsetY = Math.floor(Math.cos(x * 0.2 + time * 3) * 0.8);
                         const lookupX = Math.min(cols - 1, Math.max(0, x + offsetX));
                         const lookupY = Math.min(rows - 1, Math.max(0, y + offsetY));
+
                         if (mask[(lookupY * cols + lookupX) * 4] > 128) {
                             visibleGrid[idx] = 1;
+                            // Small pop for the "crumble" start
+                            fallVelocities[idx] = -Math.random() * 3;
                         }
                     }
                 }
                 isFalling = true;
-                
-                // 3. Handle the visual fade
                 setTimeout(() => {
                     document.getElementById('three-layer').style.opacity = '1';
                     document.getElementById('ui').style.opacity = '0.8';
@@ -171,7 +182,6 @@ canvas.addEventListener('click', () => {
                     if (isFalling) {
                         isVisible = visibleGrid[idx] === 1;
                     } else {
-                        // Apply wave distortion for the "Wavy" look
                         const offsetX = Math.floor(Math.sin(y * 0.2 + time * 4) * 1.1);
                         const offsetY = Math.floor(Math.cos(x * 0.2 + time * 3) * 0.8);
                         const lookupX = Math.min(cols - 1, Math.max(0, x + offsetX));
@@ -199,11 +209,19 @@ canvas.addEventListener('click', () => {
                         smudgeGrid[idx] *= 0.94; 
 
                         let drawY = y * cellH;
+                        let drawX = x * cellW;
+
                         if (isFalling) {
-                            if (fallDelays[idx] > 0) fallDelays[idx]--;
-                            else {
-                                fallVelocities[idx] += 0.7; 
+                            if (fallDelays[idx] > 0) {
+                                fallDelays[idx]--;
+                                // Keep the wavy movement even while waiting to crumble
+                                const offsetX = Math.sin(y * 0.2 + time * 4) * 1.1;
+                                drawX += offsetX * cellW * 0.1;
+                            } else {
+                                fallVelocities[idx] += 0.85; // Heavier gravity
                                 fallOffsets[idx] += fallVelocities[idx];
+                                // Stochastic jitter instead of drift
+                                drawX += Math.sin(fallOffsets[idx] * 0.05) * fallJitter[idx];
                             }
                             drawY += fallOffsets[idx];
                         }
@@ -222,8 +240,13 @@ canvas.addEventListener('click', () => {
                         const lightness = 30 + (s * 75) + (h * 40) + (combinedWave * 10) + shimmer + (Math.max(0, (1 - distForLight / 15)) * 40);
                         
                         let char = "";
-                        if (h > 0.9) char = boldChars[Math.floor(Math.random() * boldChars.length)];
-                        else if (s > 0.15) {
+                        if (isFalling && fallOffsets[idx] > 10) {
+                            // Degrade characters into smaller bits as they fall
+                            const crumbChars = ["·", "′", ".", "`", " "];
+                            char = crumbChars[Math.floor(Math.random() * crumbChars.length)];
+                        } else if (h > 0.9) {
+                            char = boldChars[Math.floor(Math.random() * boldChars.length)];
+                        } else if (s > 0.15) {
                             const sIdx = Math.floor((1 - s) * (smudgeChars.length - 1));
                             char = smudgeChars[Math.max(0, Math.min(smudgeChars.length - 1, sIdx))];
                         } else {
@@ -231,7 +254,7 @@ canvas.addEventListener('click', () => {
                         }
                         
                         ctx.fillStyle = `hsl(${hue}, 80%, ${Math.min(100, lightness)}%)`;
-                        ctx.fillText(char, x * cellW, drawY);
+                        ctx.fillText(char, drawX, drawY);
                     }
                 }
             }
@@ -483,9 +506,36 @@ canvas.addEventListener('click', () => {
             if(window.worldActive && !controls.isLocked) controls.lock(); 
         });
 
-        let keys = {w:0, a:0, s:0, d:0};
-        document.addEventListener('keydown', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = 1; });
-        document.addEventListener('keyup', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = 0; });
+     let keys = {
+            w: 0, a: 0, s: 0, d: 0,
+            arrowup: 0, arrowdown: 0, arrowleft: 0, arrowright: 0
+        };
+
+        document.addEventListener('keydown', e => { 
+            const key = e.key.toLowerCase();
+            if(keys.hasOwnProperty(key)) keys[key] = 1; 
+        });
+
+        document.addEventListener('keyup', e => { 
+            const key = e.key.toLowerCase();
+            if(keys.hasOwnProperty(key)) keys[key] = 0; 
+        });
+
+        // Update your movement loop (inside your requestAnimationFrame or world update)
+        // to check for BOTH sets of keys:
+        function updateMovement() {
+            if (!controls.isLocked) return;
+
+            const speed = 0.12;
+            
+            // Forward/Backward
+            if (keys.w || keys.arrowup) controls.moveForward(speed);
+            if (keys.s || keys.arrowdown) controls.moveForward(-speed);
+            
+            // Left/Right
+            if (keys.a || keys.arrowleft) controls.moveRight(-speed);
+            if (keys.d || keys.arrowright) controls.moveRight(speed);
+        }
 
         const clock = new THREE.Clock();
         function animate() {
