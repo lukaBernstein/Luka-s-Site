@@ -825,7 +825,29 @@ rock.castShadow = rock.receiveShadow = true;
         }
 
 // let isGrounded = true;
-
+// --- EXACT HITBOX AUTO-GENERATOR ---
+        // This sweeps away the old math and builds perfect local-space hitboxes
+        obstacles.length = 0; 
+        scene.updateMatrixWorld(true); 
+        
+        scene.traverse(node => {
+            if (node.isMesh) {
+                // Target Rocks, Monoliths, Trunks, and Cacti (Ignores leaves & flowers!)
+                if (node.material === rockMat || node.material === asciiPillarMat || 
+                    node.material === barkMat || node.material === cactusMat) {
+                    
+                    if (!node.geometry.boundingBox) node.geometry.computeBoundingBox();
+                    
+                    obstacles.push({
+                        mesh: node,
+                        isRound: node.geometry.type === 'IcosahedronGeometry',
+                        localBox: node.geometry.boundingBox.clone(), // The exact raw shape
+                        worldBox: new THREE.Box3().setFromObject(node) // The world boundary
+                    });
+                }
+            }
+        });
+        
         const clock = new THREE.Clock();
 
         
@@ -854,26 +876,49 @@ rock.castShadow = rock.receiveShadow = true;
                 let currentFloorY = getElevation(camera.position.x, camera.position.z) + USER_HEIGHT;
                 let hitWall = false;
 
-                const px = camera.position.x;
-                const pz = camera.position.z;
-                const playerFeetY = camera.position.y - USER_HEIGHT;
+                const playerRadius = 15; // Extremely tight radius for squeezing through gaps
+                const pWorld = camera.position.clone();
+                const pFeetY = pWorld.y - USER_HEIGHT;
 
-                // Check all exact object boundaries
-                for (let box of obstacles) {
+                // Check the perfect generated boundaries
+                for (let obs of obstacles) {
+                    const wBox = obs.worldBox;
                     
-                    // 1. Expand the Box3 horizontally by PLAYER_RADIUS so we don't clip inside
-                    if (px > box.min.x - PLAYER_RADIUS && px < box.max.x + PLAYER_RADIUS &&
-                        pz > box.min.z - PLAYER_RADIUS && pz < box.max.z + PLAYER_RADIUS) {
+                    // BROAD PHASE: Are we near the object's general area?
+                    if (pWorld.x > wBox.min.x - playerRadius && pWorld.x < wBox.max.x + playerRadius &&
+                        pWorld.z > wBox.min.z - playerRadius && pWorld.z < wBox.max.z + playerRadius) {
                         
-                        // 2. Check if we are landing on the TOP
-                        // We allow a small 40-unit buffer so you can smoothly step onto flat surfaces
-                        if (playerFeetY >= box.max.y - 60) {
-                            currentFloorY = Math.max(currentFloorY, box.max.y + USER_HEIGHT);
+                        // 1. Are we stepping safely on top of it?
+                        if (wBox.max.y < pWorld.y && pFeetY > wBox.max.y - 60) {
+                            currentFloorY = Math.max(currentFloorY, wBox.max.y + USER_HEIGHT);
                         } 
-                        // 3. Check if we hit the SIDE
-                        // If our camera (head) is above the bottom of the box, we hit a solid wall
-                        else if (camera.position.y > box.min.y) {
-                            hitWall = true;
+                        // 2. Otherwise, check exact Local geometry to see if we hit a wall
+                        else if (pWorld.y > wBox.min.y && pFeetY < wBox.max.y) {
+                            
+                            // worldToLocal mathematically 'undoes' the rotation and scale
+                            const pLocal = obs.mesh.worldToLocal(pWorld.clone());
+                            let hitWallLocal = false;
+
+                            if (obs.isRound) {
+                                // Perfect Ellipsoid Check for rotated Boulders & Monoliths
+                                const avgScale = (obs.mesh.scale.x + obs.mesh.scale.y + obs.mesh.scale.z) / 3;
+                                if (pLocal.length() < 1.0 + (playerRadius / avgScale)) {
+                                    hitWallLocal = true;
+                                }
+                            } else {
+                                // Perfect Box/Cylinder Check for Henge, Steps, and Trees
+                                const lBox = obs.localBox;
+                                const localRadX = playerRadius / obs.mesh.scale.x;
+                                const localRadZ = playerRadius / obs.mesh.scale.z;
+                                
+                                if (pLocal.x > lBox.min.x - localRadX && pLocal.x < lBox.max.x + localRadX &&
+                                    pLocal.z > lBox.min.z - localRadZ && pLocal.z < lBox.max.z + localRadZ &&
+                                    pLocal.y > lBox.min.y && pLocal.y < lBox.max.y) {
+                                    hitWallLocal = true;
+                                }
+                            }
+
+                            if (hitWallLocal) hitWall = true;
                         }
                     }
                 }
@@ -882,14 +927,8 @@ rock.castShadow = rock.receiveShadow = true;
                     camera.position.x = oldX;
                     camera.position.z = oldZ;
                 }
-
-                if (hitWall) {
-                    camera.position.x = oldX;
-                    camera.position.z = oldZ;
-                }
-
                 // Jump & Gravity
-                if (keys[" "] && isGrounded) { verticalVelocity = 800; isGrounded = false; }
+                if (keys[" "] && isGrounded) { verticalVelocity = 1300; isGrounded = false; }
                 verticalVelocity -= 2600 * delta; 
                 camera.position.y += verticalVelocity * delta;
 
