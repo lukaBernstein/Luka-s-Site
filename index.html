@@ -266,7 +266,7 @@
         resize(); animate();
     </script>
 
-    <script type="module">
+  <script type="module">  
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
@@ -367,7 +367,93 @@
             const tex = new THREE.CanvasTexture(canvas); tex.magFilter = THREE.NearestFilter; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; return tex;
         }
         const rockMat = new THREE.MeshStandardMaterial({ map: createCraggyMossRockTexture(), roughness: 0.9 });
+// --- FLOATING ASCII PILLAR MATERIAL ---
+        function createAsciiPillarTexture() {
+            const tCanv = document.createElement('canvas');
+            const tCtx = tCanv.getContext('2d');
+            tCanv.width = 128; tCanv.height = 128;
+            tCtx.fillStyle = "black"; tCtx.fillRect(0,0,128,128);
+            tCtx.font = "bold 20px monospace"; tCtx.fillStyle = "white";
+            const chars = ['X','M','W','B','R','@','#','&','0','G','Q','!','?','+','*'];
+            for(let i=0; i<16; i++) {
+                tCtx.fillText(chars[i], (i%4)*32+8, Math.floor(i/4)*32+20);
+            }
+            const tex = new THREE.CanvasTexture(tCanv);
+            tex.magFilter = THREE.NearestFilter; // Keeps it pixelated to match your world
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        }
 
+const asciiPillarMat = new THREE.ShaderMaterial({
+            uniforms: { 
+                uTime: { value: 0 }, 
+                uMap: { value: createAsciiPillarTexture() }, 
+                uColor: { value: new THREE.Color(0x00ffaa) } 
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                varying vec3 vNormal;
+                varying vec3 vViewDir;
+                void main() { 
+                    vUv = uv;
+                    vNormal = normalize(normalMatrix * normal);
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                    vViewDir = normalize(-mvPosition.xyz);
+                    gl_Position = projectionMatrix * mvPosition; 
+                }`,
+            fragmentShader: `
+                uniform float uTime; uniform sampler2D uMap; uniform vec3 uColor; 
+                varying vec2 vUv; varying vec3 vNormal; varying vec3 vViewDir;
+
+                float random(vec2 st) {
+                    return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+                }
+
+                void main() {
+                    // 1. FINE-GRAIN ASCII
+                    vec2 grid = vec2(35.0, 90.0);
+                    vec2 uv = vUv * grid;
+                    
+                    // Different column speeds for that "streaming data" look
+                    float colSpeed = random(vec2(floor(uv.x), 0.0)) * 1.2 + 0.4;
+                    uv.y += uTime * colSpeed;
+
+                    float cellId = floor(uv.x) + floor(uv.y) * 7.0;
+                    float charShift = floor(uTime * 12.0 + sin(cellId));
+                    vec2 charUv = fract(uv);
+                    
+                    float xOff = mod(charShift, 4.0) * 0.25;
+                    float yOff = floor(mod(charShift * 0.25, 4.0)) * 0.25;
+                    charUv = charUv * 0.25 + vec2(xOff, yOff);
+
+                    vec4 asciiTex = texture2D(uMap, charUv);
+
+                    // 2. STABLE SHADING
+                    // Dark obsidian base
+                    vec3 baseColor = uColor * 0.04;
+                    
+                    // Smooth breathing pulse (Breathing life into the stone)
+                    float pulse = sin(uTime * 0.5 + vUv.y * 2.0) * 0.5 + 0.5;
+                    vec3 pulseColor = uColor * pulse * 0.15;
+
+                    // Fresnel/Edge glow (Catching light on craggy corners)
+                    float fresnel = pow(1.0 - max(0.0, dot(vNormal, vViewDir)), 3.0);
+                    vec3 rimLight = uColor * fresnel * 1.2;
+
+                    // 3. ASCII LIGHTING
+                    // The letters themselves glow brightly
+                    vec3 letterGlow = uColor * asciiTex.r * 2.2;
+
+                    // 4. FINAL COMPOSITION
+                    vec3 finalColor = baseColor + pulseColor + rimLight + letterGlow;
+
+                    gl_FragColor = vec4(finalColor, 0.98);
+                }
+            `,
+            transparent: true,
+            depthWrite: true,
+            side: THREE.DoubleSide 
+        });
         const hengeRadius = 2000; 
         const hengeGroup = new THREE.Group();
         const pillarCount = 18; 
@@ -429,13 +515,18 @@
             const rU = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 20, 8), cactusMat); rU.position.set(25, 45, 0); rU.castShadow = true; g.add(rU);
             return g;
         }
+       
+    
         function buildTree() {
             const g = new THREE.Group(); const trunkHeight = 160;
             const t = new THREE.Mesh(new THREE.CylinderGeometry(6, 18, trunkHeight, 8), barkMat); t.position.y = trunkHeight / 2 - 20; t.castShadow = true; g.add(t);
             for(let i=0; i<6; i++) { const b = new THREE.Mesh(new THREE.IcosahedronGeometry(50, 0), leafMat); b.position.set((rnd()-0.5)*80, trunkHeight + (rnd()*40), (rnd()-0.5)*80); b.scale.set(1.6, 0.7, 1.6); b.castShadow = true; g.add(b); }
             return g;
         }
+        
         const cM = buildCactus(); const tM = buildTree();
+        
+        // 1. TREES FIRST (To keep your original world layout consistent)
         for(let i=0; i<1000; i++) {
             const vx = (rnd()-0.5)*110000; const vz = (rnd()-0.5)*110000;
             const distToSpawn = Math.sqrt((vx-sX)**2 + (vz-sZ)**2);
@@ -444,6 +535,40 @@
             const s = isTree ? (2.5 + rnd()*4.5) : (1.5 + rnd()*2.5); m.scale.set(s,s,s);
             m.position.set(vx, getElevation(vx, vz), vz); m.rotation.y = rnd()*Math.PI*2; 
             m.traverse(node => { if(node.isMesh) node.castShadow = true; }); scene.add(m);
+        }
+
+      
+// --- 5 DISTANT CRAGGY MONOLITHS ---
+       // --- 5 DISTANT CRAGGY MONOLITHS ---
+        const pillarGeo = new THREE.IcosahedronGeometry(1, 0); 
+        let pillarsSpawned = 0;
+
+        while(pillarsSpawned < 5) {
+            const px = sX + (rnd() - 0.5) * 45000;
+            const pz = sZ + (rnd() - 0.5) * 45000;
+            const dist = Math.sqrt((px - sX)**2 + (pz - sZ)**2);
+
+            // Keep them in the "sweet spot" of the horizon
+            if (dist > 15000 && dist < 30000) { 
+                const p = new THREE.Mesh(pillarGeo, asciiPillarMat);
+                const groundH = getElevation(px, pz);
+                
+                // Scale them to be massive (800 wide, 4000 tall)
+                const sW = 600 + rnd() * 400;
+                const sH = 3000 + rnd() * 2000;
+                p.scale.set(sW, sH, sW);
+                
+                // Position: Hovering slightly
+                p.position.set(px, groundH + (sH / 2) + 200, pz); 
+                
+                p.rotation.y = rnd() * Math.PI;
+                p.rotation.z = (rnd() - 0.5) * 0.2; 
+                
+                p.castShadow = true; // These will now cast shadows!
+                scene.add(p);
+                p.userData.rotSpeed = (rnd() - 0.5) * 0.2; // Store a unique speed for each
+                pillarsSpawned++;
+            }
         }
 
         const moteCount = 5000;
@@ -540,14 +665,22 @@
         const clock = new THREE.Clock();
         function animate() {
             requestAnimationFrame(animate);
-            const delta = clock.getDelta(), time = clock.getElapsedTime();
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+
+            // Update Shader Times
             moteMat.uniforms.uTime.value = time;
+            if (asciiPillarMat) asciiPillarMat.uniforms.uTime.value = time;
 
             if (controls.isLocked) {
                 const speed = 1800 * delta;
-                if (keys.w) controls.moveForward(speed); if (keys.s) controls.moveForward(-speed);
-                if (keys.a) controls.moveRight(-speed); if (keys.d) controls.moveRight(speed);
+                if (keys.w) controls.moveForward(speed); 
+                if (keys.s) controls.moveForward(-speed);
+                if (keys.a) controls.moveRight(-speed); 
+                if (keys.d) controls.moveRight(speed);
+
                 camera.position.y = getElevation(camera.position.x, camera.position.z) + USER_HEIGHT;
+                
                 const sDist = 35000;
                 sunMesh.position.set(camera.position.x + (SUN_DIR.x * sDist), camera.position.y + (SUN_DIR.y * sDist), camera.position.z + (SUN_DIR.z * sDist));
                 sunMesh.lookAt(camera.position);
@@ -555,11 +688,27 @@
                 sunLight.position.copy(sunMesh.position);
                 sunLight.target.position.set(camera.position.x, 0, camera.position.z);
             }
-            lanternCore.rotation.x = time * 0.5; lanternCore.rotation.y = time * 0.3;
-            const tP = new THREE.Vector3(camera.position.x + Math.cos(time * 0.6) * 150, camera.position.y + (Math.sin(time * 1.5) * 20) + 80, camera.position.z + Math.sin(time * 0.6) * 150);
-            lanternGroup.position.lerp(tP, 0.04); lanternLight.intensity = 25000 + Math.random() * 4000; 
+
+            lanternCore.rotation.x = time * 0.5; 
+            lanternCore.rotation.y = time * 0.3;
+            
+            const tP = new THREE.Vector3(
+                camera.position.x + Math.cos(time * 0.6) * 150, 
+                camera.position.y + (Math.sin(time * 1.5) * 20) + 80, 
+                camera.position.z + Math.sin(time * 0.6) * 150
+            );
+            lanternGroup.position.lerp(tP, 0.04); 
+            lanternLight.intensity = 25000 + Math.random() * 4000; 
+
             renderer.render(scene, camera);
+
+            scene.traverse(obj => {
+    if(obj.isMesh && obj.material === asciiPillarMat) {
+        obj.rotation.y += delta * (obj.userData.rotSpeed || 0.05);
+    }
+});
         }
+      
         animate();
         window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth / PIXEL_SCALE, window.innerHeight / PIXEL_SCALE, false); });
     </script>
