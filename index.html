@@ -332,6 +332,7 @@ if (isMobileDevice) {
 
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
         
 
@@ -361,7 +362,7 @@ if (isMobileDevice) {
 
         const PIXEL_SCALE = 2.5; 
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 80000);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200000);
         const renderer = new THREE.WebGLRenderer({ antialias: false });
         renderer.setSize(window.innerWidth / PIXEL_SCALE, window.innerHeight / PIXEL_SCALE, false);
         
@@ -382,7 +383,8 @@ if (isMobileDevice) {
             vertexShader: `varying vec3 vWorldPosition; void main() { vWorldPosition = position; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`,
             fragmentShader: `uniform vec3 topColor; uniform vec3 midColor; uniform vec3 bottomColor; varying vec3 vWorldPosition; void main() { float h = normalize(vWorldPosition).y; vec3 finalColor = h > 0.0 ? mix(midColor, topColor, pow(h, 0.35)) : mix(midColor, bottomColor, pow(abs(h), 1.0)); gl_FragColor = vec4(finalColor, 1.0); }`
         });
-        scene.add(new THREE.Mesh(skyGeo, skyMat));
+        const skyMesh = new THREE.Mesh(skyGeo, skyMat);
+        scene.add(skyMesh);
         scene.fog = new THREE.FogExp2(0xffb59d, 0.00004);
 
         const starGeo = new THREE.BufferGeometry();
@@ -403,7 +405,8 @@ if (isMobileDevice) {
             vertexShader: `varying vec3 vNormal; void main() { vNormal = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
             fragmentShader: `uniform vec3 sunDir; uniform vec3 glowColor; varying vec3 vNormal; void main() { vec3 dirToPoint = normalize(vNormal); float cosTheta = dot(dirToPoint, sunDir); float horizontalGlow = exp(3.0 * (cosTheta - 1.0)); float verticalMask = smoothstep(-0.8, -0.1, dirToPoint.y) * smoothstep(0.6, -0.2, dirToPoint.y); float intensity = horizontalGlow * verticalMask * 0.25; gl_FragColor = vec4(glowColor, intensity); }`
         });
-        scene.add(new THREE.Mesh(hazeGeo, hazeMat));
+        const hazeMesh = new THREE.Mesh(hazeGeo, hazeMat);
+        scene.add(hazeMesh);
 
         let sX = 0, sZ = 0, maxH = -Infinity;
         for (let x = 2500; x <= 4500; x += 50) {
@@ -635,179 +638,219 @@ const s = Math.sin(angle); const c = Math.cos(angle);
         })();
 
 
-        const baseRockGeo = new THREE.IcosahedronGeometry(1, 1);
-        for(let i=0; i<2000; i++) {
-            const clusterX = (rnd() - 0.5) * 110000; const clusterZ = (rnd() - 0.5) * 110000;
-            const distToSpawn = Math.sqrt((clusterX-sX)**2 + (clusterZ-sZ)**2);
-            if (distToSpawn < hengeRadius + 800 || (clusterZ - sZ < 0 && Math.abs(clusterX - sX) < 1200)) continue;
-            const rocksInCluster = Math.floor(rnd() * 8) + 4; 
-            for(let j=0; j<rocksInCluster; j++) {
-                
-                const rock = new THREE.Mesh(baseRockGeo, rockMat);
-                const baseScale = 10 + Math.pow(rnd(), 2.5) * 350; 
-                rock.scale.set(baseScale * (0.8 + rnd() * 0.4), baseScale * (0.5 + rnd() * 0.5), baseScale * (0.8 + rnd() * 0.4));
-                const worldX = clusterX + (rnd() - 0.5) * rock.scale.x * 2.5;
-                const worldZ = clusterZ + (rnd() - 0.5) * rock.scale.z * 2.5;
-                rock.position.set(worldX, getElevation(worldX, worldZ) + (rock.scale.y * 0.2), worldZ);
-                rock.rotation.set(rnd()*Math.PI, rnd()*Math.PI, rnd()*Math.PI);
-                rock.castShadow = rock.receiveShadow = true;
-                scene.add(rock);
 
-                // Ellipsoid collision: transform player into rock's local space,
-                // then test (lx/rx)²+(ly/ry)²+(lz/rz)² < 1.
-                // This is exact for a scaled sphere / icosahedron regardless of rotation.
-                // 0.88 shrinks radii slightly so the hitbox hugs the visual surface.
-                rock.updateMatrixWorld(true);
-                const invMat = new THREE.Matrix4().copy(rock.matrixWorld).invert();
-                const rockAABB = new THREE.Box3().setFromObject(rock);
-                obstacles.push({ type: 'ellipsoid',
-                    invMatrix: invMat,
-                    fwdMatrix: rock.matrixWorld.clone(),
-                    aabb: rockAABB,
-                    rx: rock.scale.x * 0.88,
-                    ry: rock.scale.y * 0.88,
-                    rz: rock.scale.z * 0.88,
-                    center: rock.position.clone()
+        // ── TREES ──
+        // Trunk Y: -6.735 (base) to 12.743 (top). Total height = 19.478 local units.
+        // Lift = 6.735 * scale puts trunk base exactly on groundY.
+        (function spawnTrees() {
+            const loader = new GLTFLoader();
+            loader.load('assets/giant_low_poly_tree.glb', gltf => {
+                const template = gltf.scene;
+                template.traverse(n => {
+                    if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; }
                 });
-                
-                
-            }
-        }
 
-        function createBarkTexture() {
-            const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 64;
-            const ctx = canvas.getContext('2d'); ctx.fillStyle = '#4a3b2f'; ctx.fillRect(0,0,32,64);
-            const barkColors = ['#5c4b3d', '#3d3126', '#6b5a4b'];
-            for(let i=0; i<800; i++){ ctx.fillStyle = barkColors[Math.floor(rnd()*3)]; ctx.fillRect(Math.floor(rnd()*32), Math.floor(rnd()*64), 1, 2 + Math.floor(rnd()*4)); }
-            const tex = new THREE.CanvasTexture(canvas); tex.magFilter = THREE.NearestFilter; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; return tex;
-        }
-        const barkMat = new THREE.MeshStandardMaterial({ map: createBarkTexture() });
-        const cactusMat = new THREE.MeshStandardMaterial({ color: 0x1a823e });
-        const leafMat = new THREE.MeshStandardMaterial({ color: 0x2d331d, roughness: 1.0, flatShading: true });
+                const TREE_H = 19.478;
+                const BASE_Y = 6.735;   // abs of trunk min Y — lift amount per scale unit
+                const TRUNK_R = 1.5;
 
-        // Flower Assets
-        const flowerGeo = new THREE.PlaneGeometry(40, 40);
-        const flowerColors = [0xffb7ff, 0xffffb7, 0xffffff, 0x87ceeb]; // Pink, Yellow, White, Blue
+                let spawned = 0;
+                for (let i = 0; i < 1500 && spawned < 500; i++) {
+                    const vx = (rnd()-0.5)*108000;
+                    const vz = (rnd()-0.5)*108000;
+                    if (Math.sqrt((vx-sX)**2+(vz-sZ)**2) < 2600) continue;
 
-       function createFlower() {
-            const group = new THREE.Group();
-            group.name = "flower"; // Added for the swaying animation
-            const color = flowerColors[Math.floor(rnd() * flowerColors.length)];
+                    const gy = getElevation(vx, vz);
+                    const ry = rnd() * Math.PI * 2;
 
-            // Create a 5-Petal Shape procedurally
-            const size = 128; // Increased resolution for smoother edges
-            const data = new Uint8Array(size * size);
-            for (let i = 0; i < size * size; i++) {
-                const x = (i % size) / size - 0.5;
-                const y = Math.floor(i / size) / size - 0.5;
-                
-                const dist = Math.sqrt(x * x + y * y);
-                const angle = Math.atan2(y, x);
-                
-                // MATH: This creates 5 petals by oscillating the radius based on angle
-                const petalShape = 0.2 + 0.2 * Math.cos(angle * 5);
-                
-                // If the pixel is inside the petal shape, make it visible (255)
-                data[i] = dist < petalShape ? 255 : 0; 
-            }
-            
-            const mask = new THREE.DataTexture(data, size, size, THREE.LuminanceFormat);
-            mask.needsUpdate = true;
+                    // World height 800–2000 units — large and visible from a distance
+                    const worldH = 800 + rnd() * 1200;
+                    const sc = worldH / TREE_H;
 
-            const mat = new THREE.MeshLambertMaterial({ 
-                color: color, 
-                side: THREE.DoubleSide,
-                alphaMap: mask,
-                transparent: true,
-                alphaTest: 0.5 
+                    const m = template.clone();
+                    m.scale.setScalar(sc);
+                    m.rotation.y = ry;
+                    // Place so trunk base sits on terrain
+                    // Model origin is at ground level — no lift needed.
+                    // Sink slightly so roots embed naturally in terrain.
+                    m.position.set(vx, gy - sc * 0.5, vz);
+                    scene.add(m);
+
+                    obstacles.push({
+                        type: 'cylinder',
+                        cx: vx, cz: vz,
+                        r: TRUNK_R * sc,
+                        minY: gy,
+                        maxY: gy + worldH
+                    });
+                    spawned++;
+                }
+                console.log('Trees spawned:', spawned);
+            }, undefined, e => console.warn('Tree GLB not found:', e));
+        })();
+
+
+
+
+        // ── FLOWERS ──
+        // low_poly_flowers.glb: two meshes under RootNode (Circle.001 + Circle.006_Circle.007)
+        // Y-up, ~0.33 units tall, base Y=-0.256. Lift = 0.256 * scale.
+        (function spawnFlowers() {
+            const loader = new GLTFLoader();
+            loader.load('assets/low_poly_flowers.glb', gltf => {
+                const template = gltf.scene;
+                template.traverse(n => {
+                    if (n.isMesh) { n.castShadow = false; n.receiveShadow = true; }
+                });
+
+                const BASE_Y = 0.256;
+
+                function tooClose(vx, vz) {
+                    return Math.sqrt((vx-sX)**2+(vz-sZ)**2) < 2600;
+                }
+
+                // 12 giant landmark flowers
+                let giantsPlaced = 0;
+                for (let i = 0; i < 2000 && giantsPlaced < 12; i++) {
+                    const fx = (rnd()-0.5)*108000;
+                    const fz = (rnd()-0.5)*108000;
+                    if (tooClose(fx, fz)) continue;
+                    const gy = getElevation(fx, fz);
+                    const sc = 20 + rnd()*50; // original tree-sized
+                    const m = template.clone();
+                    m.scale.setScalar(sc);
+                    m.rotation.y = rnd()*Math.PI*2;
+                    m.position.set(fx, gy + BASE_Y * sc, fz);
+                    scene.add(m);
+                    giantsPlaced++;
+                }
+
+                // 400 normal-sized flowers
+                let normalPlaced = 0;
+                for (let i = 0; i < 4000 && normalPlaced < 400; i++) {
+                    const fx = (rnd()-0.5)*108000;
+                    const fz = (rnd()-0.5)*108000;
+                    if (tooClose(fx, fz)) continue;
+                    const gy = getElevation(fx, fz);
+                    const sc = 1.5 + rnd()*2; // normal flower sized
+                    const m = template.clone();
+                    m.scale.setScalar(sc);
+                    m.rotation.y = rnd()*Math.PI*2;
+                    m.position.set(fx, gy + BASE_Y * sc, fz);
+                    scene.add(m);
+                    normalPlaced++;
+                }
+                console.log('Flowers spawned');
+            }, undefined, e => console.warn('Flowers GLB not found:', e));
+        })();
+
+
+        // ── ROCKS — 10 individual rocks ──
+        // We use Three.js's runtime Box3 to measure the ACTUAL visual bounds
+        // after all baked transforms are applied. No more guessing.
+        (function spawnRocks() {
+            const ROCK_FILES = ['rock1.glb','rock2.glb','rock3.glb','rock4.glb','rock5.glb',
+                                'rock6.glb','rock7.glb','rock8.glb','rock9.glb','rock10.glb'];
+
+            const templates = {}; // file → { scene, baseY, height }
+            let loaded = 0;
+            const loader = new GLTFLoader();
+
+            ROCK_FILES.forEach(file => {
+                loader.load('assets/' + file, gltf => {
+                    const tmpl = gltf.scene;
+                    tmpl.traverse(n => {
+                        if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; }
+                    });
+
+                    // Measure actual bounding box AFTER all transforms applied
+                    const box = new THREE.Box3().setFromObject(tmpl);
+                    const baseY = box.min.y;     // visual bottom in local space
+                    const height = box.max.y - box.min.y;
+
+                    templates[file] = { scene: tmpl, baseY, height };
+                    console.log(file, 'baseY=', baseY.toFixed(3), 'height=', height.toFixed(3));
+
+                    if (++loaded === ROCK_FILES.length) doSpawn();
+                }, undefined, () => { if (++loaded === ROCK_FILES.length) doSpawn(); });
             });
 
-            // The Petal Planes - Square geometry works best for the petal math
-            const p1 = new THREE.Mesh(new THREE.PlaneGeometry(45, 45), mat);
-            const p2 = new THREE.Mesh(new THREE.PlaneGeometry(45, 45), mat);
-            p2.rotation.y = Math.PI / 2;
-            
-            // The Stem (A thin green line/cylinder)
-            const stemGeo = new THREE.CylinderGeometry(1.5, 1.5, 40);
-            const stemMat = new THREE.MeshLambertMaterial({ color: 0x2d5a27 });
-            const stem = new THREE.Mesh(stemGeo, stemMat);
-            stem.position.y = -20; // Move it down so the flower is on top
+            function doSpawn() {
+                function pick(arr) { return arr[Math.floor(rnd()*arr.length)]; }
 
-            // The Yellow Center (make it smaller so it doesn't hide the petals)
-            const centerGeo = new THREE.SphereGeometry(5, 6, 6);
-            const centerMat = new THREE.MeshLambertMaterial({ color: 0xffff00 });
-            const center = new THREE.Mesh(centerGeo, centerMat);
+                function placeRock(file, wx, wy, wz, worldH) {
+                    const tmpl = templates[file];
+                    if (!tmpl) return;
+                    const sc = worldH / tmpl.height;
+                    const m = tmpl.scene.clone();
+                    m.scale.setScalar(sc);
+                    m.rotation.y = rnd()*Math.PI*2;
+                    // Place so the visual base sits exactly on groundY.
+                    // baseY is measured in unscaled local space, so multiply by sc.
+                    m.position.set(wx, wy - tmpl.baseY * sc, wz);
+                    m.traverse(n => { if(n.isMesh){ n.castShadow=true; n.receiveShadow=true; }});
+                    scene.add(m);
+                }
 
-            group.add(p1, p2, stem, center);
-            
-            // Move the whole group up so the bottom of the stem hits the ground
-            group.position.y = 20; 
-            
-            return group;
-        }
-        
-        function buildCactus() {
-            const g = new THREE.Group(); const t = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 80, 8), cactusMat); t.position.y = 40; t.castShadow = true; g.add(t);
-            const lA = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 30, 8), cactusMat); lA.position.set(-15, 50, 0); lA.rotation.z = Math.PI/2; lA.castShadow = true; g.add(lA);
-            const lU = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 25, 8), cactusMat); lU.position.set(-25, 62, 0); lU.castShadow = true; g.add(lU);
-            const rA = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 30, 8), cactusMat); rA.position.set(15, 35, 0); rA.rotation.z = Math.PI/2; rA.castShadow = true; g.add(rA);
-            const rU = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 20, 8), cactusMat); rU.position.set(25, 45, 0); rU.castShadow = true; g.add(rU);
-            return g;
-        }
-       
-    
-        function buildTree() {
-            const g = new THREE.Group(); const trunkHeight = 160;
-            const t = new THREE.Mesh(new THREE.CylinderGeometry(6, 18, trunkHeight, 8), barkMat); t.position.y = trunkHeight / 2 - 20; t.castShadow = true; g.add(t);
-            for(let i=0; i<6; i++) { const b = new THREE.Mesh(new THREE.IcosahedronGeometry(50, 0), leafMat); b.position.set((rnd()-0.5)*80, trunkHeight + (rnd()*40), (rnd()-0.5)*80); b.scale.set(1.6, 0.7, 1.6); b.castShadow = true; g.add(b); }
-            return g;
-        }
-        
-        const cM = buildCactus(); const tM = buildTree();
-        
-        for(let i=0; i<1000; i++) {
-            const vx = (rnd()-0.5)*110000; const vz = (rnd()-0.5)*110000;
-            const distToSpawn = Math.sqrt((vx-sX)**2 + (vz-sZ)**2);
-            if (distToSpawn < hengeRadius + 900 || (vz - sZ < 0 && Math.abs(vx - sX) < 1400)) continue;
-            const isTree = rnd() > 0.6;
-            const m = isTree ? tM.clone() : cM.clone();
-            const s = isTree ? (2.5 + rnd()*4.5) : (1.5 + rnd()*2.5);
-            m.scale.set(s, s, s);
-            const groundY = getElevation(vx, vz);
-            m.position.set(vx, groundY, vz);
-            m.rotation.y = rnd() * Math.PI * 2;
-            m.traverse(node => { if(node.isMesh) node.castShadow = true; });
-            scene.add(m);
-            // Trunk-only cylinder — leaf blobs have no collision
-            if (isTree) {
-                obstacles.push({ type: 'cylinder', cx: vx, cz: vz, r: 18 * s, minY: groundY, maxY: groundY + 160 * s });
-            } else {
-                obstacles.push({ type: 'cylinder', cx: vx, cz: vz, r: 8 * s,  minY: groundY, maxY: groundY + 80 * s });
+                function tooClose(vx, vz) {
+                    return Math.sqrt((vx-sX)**2+(vz-sZ)**2) < 2600;
+                }
+
+                const available = ROCK_FILES.filter(f => templates[f]);
+                console.log('Rock variants ready:', available.length);
+
+                // 800 Joshua Tree style clusters
+                for (let i = 0; i < 800; i++) {
+                    const clX = (rnd()-0.5)*108000;
+                    const clZ = (rnd()-0.5)*108000;
+                    if (tooClose(clX, clZ)) continue;
+
+                    const spread = 200 + rnd()*500;
+
+                    // 1–2 large anchor rocks, 200–500 world units tall
+                    const anchorCount = Math.floor(rnd()*2)+1;
+                    for (let a=0; a<anchorCount; a++) {
+                        const ax = clX+(rnd()-0.5)*100;
+                        const az = clZ+(rnd()-0.5)*100;
+                        const gy = getElevation(ax, az);
+                        const file = pick(available);
+                        const worldH = 200 + rnd()*300;
+                        placeRock(file, ax, gy, az, worldH);
+                        obstacles.push({type:'cylinder', cx:ax, cz:az,
+                            r:worldH*0.4, minY:gy, maxY:gy+worldH});
+                    }
+
+                    // 2–4 medium rocks, 60–160 world units
+                    const medCount = Math.floor(rnd()*3)+2;
+                    for (let m2=0; m2<medCount; m2++) {
+                        const angle = rnd()*Math.PI*2;
+                        const dist = 80 + rnd()*spread*0.4;
+                        const bx = clX+Math.cos(angle)*dist;
+                        const bz = clZ+Math.sin(angle)*dist;
+                        const gy = getElevation(bx, bz);
+                        const file = pick(available);
+                        const worldH = 60 + rnd()*100;
+                        placeRock(file, bx, gy, bz, worldH);
+                        obstacles.push({type:'cylinder', cx:bx, cz:bz,
+                            r:worldH*0.35, minY:gy, maxY:gy+worldH});
+                    }
+
+                    // 2–6 small scatter rocks, 15–50 world units
+                    const smallCount = Math.floor(rnd()*5)+2;
+                    for (let s=0; s<smallCount; s++) {
+                        const angle = rnd()*Math.PI*2;
+                        const dist = spread*0.3 + rnd()*spread*0.7;
+                        const sx = clX+Math.cos(angle)*dist;
+                        const sz = clZ+Math.sin(angle)*dist;
+                        const gy = getElevation(sx, sz);
+                        placeRock(pick(available), sx, gy, sz, 15+rnd()*35);
+                    }
+                }
+                console.log('Rocks spawned');
             }
-        }
+        })();
 
-        for(let i = 0; i < 1500; i++) {
-            const fx = (rnd() - 0.5) * 110000;
-            const fz = (rnd() - 0.5) * 110000;
-            
-            // Avoid spawning in the center spawn area
-            if (Math.sqrt(fx*fx + fz*fz) < 2500) continue;
 
-            const flower = createFlower();
-            const scale = 0.5 + rnd() * 1.5;
-            flower.scale.set(scale, scale, scale);
-            
-            // Position on the grass
-            flower.position.set(fx, getElevation(fx, fz) + (20 * scale), fz);
-            
-            // Randomly tilt them slightly so they look natural
-            flower.rotation.x = (rnd() - 0.5) * 0.2;
-            flower.rotation.z = (rnd() - 0.5) * 0.2;
-
-            scene.add(flower);
-        }
-
-      
 // --- 5 DISTANT CRAGGY MONOLITHS ---
        // --- 5 DISTANT CRAGGY MONOLITHS ---
         const pillarGeo = new THREE.IcosahedronGeometry(1, 0); 
@@ -1067,6 +1110,9 @@ const s = Math.sin(angle); const c = Math.cos(angle);
             );
             lanternGroup.position.lerp(tP, 0.04); 
             lanternLight.intensity = 25000 + Math.random() * 4000; 
+
+            skyMesh.position.copy(camera.position);
+            hazeMesh.position.copy(camera.position);
 
             renderer.render(scene, camera);
 
