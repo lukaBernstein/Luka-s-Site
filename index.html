@@ -745,111 +745,134 @@ const s = Math.sin(angle); const c = Math.cos(angle);
         })();
 
 
-        // ── ROCKS — 10 individual rocks ──
-        // We use Three.js's runtime Box3 to measure the ACTUAL visual bounds
-        // after all baked transforms are applied. No more guessing.
-        (function spawnRocks() {
-            const ROCK_FILES = ['rock1.glb','rock2.glb','rock3.glb','rock4.glb','rock5.glb',
-                                'rock6.glb','rock7.glb','rock8.glb','rock9.glb','rock10.glb'];
-
-            const templates = {}; // file → { scene, baseY, height }
-            let loaded = 0;
+        // ── 70 STYLIZED ROCKS ──
+        // Pack contains 70 separate rocks positioned at different XYZ in the shared
+        // vertex space (like a Blender grid layout). On load, we extract each mesh
+        // and re-centre its geometry around origin so we can place each one correctly.
+        (function spawn70Rocks() {
             const loader = new GLTFLoader();
+            loader.load('assets/70_stylized_rocks.glb', gltf => {
+                const templates = [];
+                
+                // Walk the scene in order — the pack is sorted smallest to biggest,
+                // so the array index tells us each rock's relative size.
+                const rawNodes = [];
+                gltf.scene.traverse(node => {
+                    if (node.isMesh && node.name && node.name.startsWith('Object_')) {
+                        rawNodes.push(node);
+                    }
+                });
+                // Sort by the numeric suffix in the name to ensure correct size order
+                rawNodes.sort((a, b) => {
+                    const na = parseInt(a.name.split('_')[1]);
+                    const nb = parseInt(b.name.split('_')[1]);
+                    return na - nb;
+                });
 
-            ROCK_FILES.forEach(file => {
-                loader.load('assets/' + file, gltf => {
-                    const tmpl = gltf.scene;
-                    tmpl.traverse(n => {
-                        if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; }
+                rawNodes.forEach(node => {
+                    const geo = node.geometry.clone();
+                    geo.computeBoundingBox();
+                    const box = geo.boundingBox;
+                    const cx = (box.min.x + box.max.x) * 0.5;
+                    const cy = (box.min.y + box.max.y) * 0.5;
+                    const cz = (box.min.z + box.max.z) * 0.5;
+                    geo.translate(-cx, -cy, -cz);
+                    geo.computeBoundingBox();
+                    templates.push({
+                        geometry: geo,
+                        material: node.material,
+                        baseY: geo.boundingBox.min.y,
+                        height: geo.boundingBox.max.y - geo.boundingBox.min.y
                     });
+                });
+                
+                console.log('Loaded', templates.length, 'rock templates from 70-pack');
+                if (templates.length === 0) return;
+                
+                // Biased pickers: templates are sorted smallest→biggest (70 total).
+                // Big pool = indexes 35–69 (bigger half). Med pool = 15–54. Small = 0–19.
+                function pickBig()   { return templates[35 + Math.floor(rnd() * 35)]; }
+                function pickMed()   { return templates[15 + Math.floor(rnd() * 40)]; }
+                function pickSmall() { return templates[Math.floor(rnd() * 20)]; }
 
-                    // Measure actual bounding box AFTER all transforms applied
-                    const box = new THREE.Box3().setFromObject(tmpl);
-                    const baseY = box.min.y;     // visual bottom in local space
-                    const height = box.max.y - box.min.y;
-
-                    templates[file] = { scene: tmpl, baseY, height };
-                    console.log(file, 'baseY=', baseY.toFixed(3), 'height=', height.toFixed(3));
-
-                    if (++loaded === ROCK_FILES.length) doSpawn();
-                }, undefined, () => { if (++loaded === ROCK_FILES.length) doSpawn(); });
-            });
-
-            function doSpawn() {
-                function pick(arr) { return arr[Math.floor(rnd()*arr.length)]; }
-
-                function placeRock(file, wx, wy, wz, worldH) {
-                    const tmpl = templates[file];
-                    if (!tmpl) return;
+                function placeRock(wx, wy, wz, worldH, tmpl) {
+                    tmpl = tmpl || pickBig();
                     const sc = worldH / tmpl.height;
-                    const m = tmpl.scene.clone();
+                    const m = new THREE.Mesh(tmpl.geometry, tmpl.material);
                     m.scale.setScalar(sc);
-                    m.rotation.y = rnd()*Math.PI*2;
-                    // Place so the visual base sits exactly on groundY.
-                    // baseY is measured in unscaled local space, so multiply by sc.
-                    m.position.set(wx, wy - tmpl.baseY * sc, wz);
-                    m.traverse(n => { if(n.isMesh){ n.castShadow=true; n.receiveShadow=true; }});
+                    m.rotation.y = rnd() * Math.PI * 2;
+
+                    // Sample terrain at 4 points around rock footprint — use LOWEST.
+                    // Then sink rocks a bit so they look settled, not perched on tiptoes.
+                    const r = worldH * 0.35;
+                    const gy1 = getElevation(wx + r, wz);
+                    const gy2 = getElevation(wx - r, wz);
+                    const gy3 = getElevation(wx, wz + r);
+                    const gy4 = getElevation(wx, wz - r);
+                    const lowestGround = Math.min(wy, gy1, gy2, gy3, gy4);
+                    const settleSink = worldH * 0.12; // 12% of height buried
+
+                    m.position.set(wx, lowestGround - tmpl.baseY * sc - settleSink, wz);
+                    m.castShadow = true;
+                    m.receiveShadow = true;
                     scene.add(m);
+                    return { mesh: m, scaledHeight: worldH };
                 }
 
                 function tooClose(vx, vz) {
                     return Math.sqrt((vx-sX)**2+(vz-sZ)**2) < 2600;
                 }
 
-                const available = ROCK_FILES.filter(f => templates[f]);
-                console.log('Rock variants ready:', available.length);
-
-                // 800 Joshua Tree style clusters
-                for (let i = 0; i < 800; i++) {
+                // 1200 Joshua Tree style clusters — mostly BIG rocks
+                for (let i = 0; i < 1200; i++) {
                     const clX = (rnd()-0.5)*108000;
                     const clZ = (rnd()-0.5)*108000;
                     if (tooClose(clX, clZ)) continue;
 
-                    const spread = 200 + rnd()*500;
+                    const spread = 250 + rnd()*600;
 
-                    // 1–2 large anchor rocks, 200–500 world units tall
-                    const anchorCount = Math.floor(rnd()*2)+1;
+                    // 2–4 LARGE anchor rocks — bigger world size + all from big pool
+                    const anchorCount = Math.floor(rnd()*3)+2;
                     for (let a=0; a<anchorCount; a++) {
-                        const ax = clX+(rnd()-0.5)*100;
-                        const az = clZ+(rnd()-0.5)*100;
+                        const ax = clX+(rnd()-0.5)*180;
+                        const az = clZ+(rnd()-0.5)*180;
                         const gy = getElevation(ax, az);
-                        const file = pick(available);
-                        const worldH = 200 + rnd()*300;
-                        placeRock(file, ax, gy, az, worldH);
+                        const worldH = 350 + rnd()*450; // 350–800 world units (was 200–500)
+                        placeRock(ax, gy, az, worldH, pickBig());
                         obstacles.push({type:'cylinder', cx:ax, cz:az,
                             r:worldH*0.4, minY:gy, maxY:gy+worldH});
                     }
 
-                    // 2–4 medium rocks, 60–160 world units
-                    const medCount = Math.floor(rnd()*3)+2;
+                    // 3–6 medium-large rocks around the anchors (still biased toward big pool)
+                    const medCount = Math.floor(rnd()*4)+3;
                     for (let m2=0; m2<medCount; m2++) {
                         const angle = rnd()*Math.PI*2;
-                        const dist = 80 + rnd()*spread*0.4;
+                        const dist = 120 + rnd()*spread*0.4;
                         const bx = clX+Math.cos(angle)*dist;
                         const bz = clZ+Math.sin(angle)*dist;
                         const gy = getElevation(bx, bz);
-                        const file = pick(available);
-                        const worldH = 60 + rnd()*100;
-                        placeRock(file, bx, gy, bz, worldH);
+                        const worldH = 150 + rnd()*200; // 150–350 (was 60–160)
+                        // 70% big, 30% medium pool
+                        const tmpl = rnd() < 0.7 ? pickBig() : pickMed();
+                        placeRock(bx, gy, bz, worldH, tmpl);
                         obstacles.push({type:'cylinder', cx:bx, cz:bz,
                             r:worldH*0.35, minY:gy, maxY:gy+worldH});
                     }
 
-                    // 2–6 small scatter rocks, 15–50 world units
-                    const smallCount = Math.floor(rnd()*5)+2;
+                    // Only 1–2 small scatter rocks — far fewer small rocks than before
+                    const smallCount = Math.floor(rnd()*2)+1;
                     for (let s=0; s<smallCount; s++) {
                         const angle = rnd()*Math.PI*2;
-                        const dist = spread*0.3 + rnd()*spread*0.7;
+                        const dist = spread*0.4 + rnd()*spread*0.6;
                         const sx = clX+Math.cos(angle)*dist;
                         const sz = clZ+Math.sin(angle)*dist;
                         const gy = getElevation(sx, sz);
-                        placeRock(pick(available), sx, gy, sz, 15+rnd()*35);
+                        placeRock(sx, gy, sz, 50+rnd()*80, pickMed()); // medium-small
                     }
                 }
                 console.log('Rocks spawned');
-            }
+            }, undefined, e => console.warn('70-rock pack not found:', e));
         })();
-
 
 // --- 5 DISTANT CRAGGY MONOLITHS ---
        // --- 5 DISTANT CRAGGY MONOLITHS ---
