@@ -1488,7 +1488,7 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                         const gy = getElevation(gx, gz);
 
                         const tIdx    = Math.floor(rnd() * templates.length);
-                        const targetH = 24 + rnd() * 40;                // 24–64 world units tall
+                        const targetH = 60 + rnd() * 90;                // 60–150 world units tall
                         const sc      = targetH / templates[tIdx].height;
 
                         // Sink ~3 units so roots are below terrain, no floating tufts
@@ -1538,6 +1538,8 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                 // sits at y=0 and it's centred in X/Z.
                 const bb = new THREE.Box3().setFromObject(raw);
                 const height = Math.max(bb.max.y - bb.min.y, 0.0001);
+                const widthX = bb.max.x - bb.min.x;
+                const widthZ = bb.max.z - bb.min.z;
                 raw.position.set(
                     -(bb.min.x + bb.max.x) * 0.5,
                     -bb.min.y,
@@ -1565,7 +1567,6 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                         const r  = Math.sqrt(rnd()) * patchR;
                         const mx = cx + Math.cos(a) * r;
                         const mz = cz + Math.sin(a) * r;
-                        const gy = getElevation(mx, mz);
 
                         const worldH = 25 + rnd() * 55;          // 25–80 units tall
                         const sc = worldH / height;
@@ -1576,12 +1577,22 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                         // Tiny random lean so they don't all face identically
                         m.rotation.x = (rnd() - 0.5) * 0.08;
                         m.rotation.z = (rnd() - 0.5) * 0.08;
-                        // Sink ~7% of height into the terrain so the stem
-                        // base reads as planted in soil instead of hovering.
-                        // The model's bbox includes a thin air gap below
-                        // the visible cap, which is what made unsunk
-                        // placements look like they were floating.
-                        m.position.set(mx, gy - worldH * 0.07, mz);
+                        // Footprint-aware grounding. On hills a single
+                        // center-sample left the downslope edge of the
+                        // base hovering above terrain. Sample at the four
+                        // edges of the footprint plus center, take the
+                        // LOWEST, then sink hard so the entire base reads
+                        // as planted in soil. The cap is round and small,
+                        // so over-sinking the upslope side just blends
+                        // into the ground naturally.
+                        const footR = Math.max(widthX, widthZ) * sc * 0.5;
+                        const gyC = getElevation(mx, mz);
+                        const gyN = getElevation(mx, mz - footR);
+                        const gyS = getElevation(mx, mz + footR);
+                        const gyE = getElevation(mx + footR, mz);
+                        const gyW = getElevation(mx - footR, mz);
+                        const lowestGy = Math.min(gyC, gyN, gyS, gyE, gyW);
+                        m.position.set(mx, lowestGy - worldH * 0.18, mz);
                         scene.add(m);
                         placed++;
                     }
@@ -1641,7 +1652,7 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                 // that tanked perf without contributing to the silhouette.
                 function pickBig() { return templates[60 + Math.floor(rnd() * 10)]; }
 
-                function placeRock(wx, wy, wz, worldH, tmpl) {
+                function placeRock(wx, wy, wz, worldH, tmpl, addCollision = false) {
                     tmpl = tmpl || pickBig();
                     const sc = worldH / tmpl.height;
                     const m = new THREE.Mesh(tmpl.geometry, tmpl.material);
@@ -1662,6 +1673,33 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                     m.castShadow = true;
                     m.receiveShadow = true;
                     scene.add(m);
+
+                    // OBB (oriented bounding box). Same shape as the local
+                    // bbox of the geometry, but rotated WITH the rock instead
+                    // of axis-aligned to the world. This eliminates the
+                    // rotation inflation that AABBs suffer (a square rock
+                    // rotated 45° gives an AABB ~41% bigger than its actual
+                    // footprint). The match is exact at every Y rotation.
+                    // Stored as: center, half-extents in local space (already
+                    // scaled to world units), and precomputed cos/sin of the
+                    // Y rotation so the per-frame test is just a 2D rotate
+                    // + AABB compare in the rock's local frame.
+                    if (addCollision) {
+                        const bb = tmpl.geometry.boundingBox;
+                        const hx = (bb.max.x - bb.min.x) * 0.5 * sc;
+                        const hy = (bb.max.y - bb.min.y) * 0.5 * sc;
+                        const hz = (bb.max.z - bb.min.z) * 0.5 * sc;
+                        obstacles.push({
+                            type: 'obb',
+                            cx: m.position.x, cy: m.position.y, cz: m.position.z,
+                            hx, hy, hz,
+                            minY: m.position.y - hy,
+                            maxY: m.position.y + hy,
+                            cosT: Math.cos(m.rotation.y),
+                            sinT: Math.sin(m.rotation.y)
+                        });
+                    }
+
                     return { mesh: m, scaledHeight: worldH };
                 }
 
@@ -1696,9 +1734,7 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                         const az = clZ + (rnd()-0.5)*180;
                         const gy = getElevation(ax, az);
                         const worldH = 220 + rnd()*330;          // 220–550
-                        placeRock(ax, gy, az, worldH, pickBig());
-                        obstacles.push({type:'cylinder', cx:ax, cz:az,
-                            r:worldH*0.4, minY:gy, maxY:gy+worldH});
+                        placeRock(ax, gy, az, worldH, pickBig(), true);
                     }
 
                     // 3–5 medium surrounders
@@ -1710,9 +1746,7 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                         const bz = clZ + Math.sin(a)*d;
                         const gy = getElevation(bx, bz);
                         const worldH = 110 + rnd()*170;          // 110–280
-                        placeRock(bx, gy, bz, worldH, pickBig());
-                        obstacles.push({type:'cylinder', cx:bx, cz:bz,
-                            r:worldH*0.35, minY:gy, maxY:gy+worldH});
+                        placeRock(bx, gy, bz, worldH, pickBig(), true);
                     }
 
                     // 2–4 trailing stones (now "small" only by world scale,
@@ -1748,9 +1782,7 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                         const az = clZ + Math.sin(angle) * r;
                         const gy = getElevation(ax, az);
                         const worldH = 750 + rnd()*550;           // 750–1300!
-                        placeRock(ax, gy, az, worldH, pickBig());
-                        obstacles.push({type:'cylinder', cx:ax, cz:az,
-                            r:worldH*0.42, minY:gy, maxY:gy+worldH});
+                        placeRock(ax, gy, az, worldH, pickBig(), true);
                     }
 
                     // 6–10 large-medium rocks in a wider ring
@@ -1762,9 +1794,7 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                         const bz = clZ + Math.sin(a)*d;
                         const gy = getElevation(bx, bz);
                         const worldH = 220 + rnd()*380;           // 220–600
-                        placeRock(bx, gy, bz, worldH, pickBig());
-                        obstacles.push({type:'cylinder', cx:bx, cz:bz,
-                            r:worldH*0.38, minY:gy, maxY:gy+worldH});
+                        placeRock(bx, gy, bz, worldH, pickBig(), true);
                     }
 
                     // 4–8 scatter rocks around the edges
@@ -2040,6 +2070,18 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                     const ey = _pLocal.y / obs.ry;
                     const ez = _pLocal.z / obs.rz;
                     if (ex*ex + ey*ey + ez*ez < 1.0) return true;
+                } else if (obs.type === 'obb') {
+                    // Y-band reject (same shape as cylinder/box).
+                    if (hy <= obs.minY || fy >= obs.maxY) continue;
+                    // Bring the test point into the OBB's local XZ frame by
+                    // rotating it by -theta around the OBB's center. Since
+                    // we only rotate around Y, the vertical axis is shared
+                    // with the world and we can test it as a band above.
+                    const dx = tx - obs.cx, dz = tz - obs.cz;
+                    const lx = dx * obs.cosT - dz * obs.sinT;
+                    const lz = dx * obs.sinT + dz * obs.cosT;
+                    if (Math.abs(lx) < obs.hx + PR &&
+                        Math.abs(lz) < obs.hz + PR) return true;
                 } else {
                     const b = obs.box;
                     if (hy <= b.min.y || fy >= b.max.y) continue;
@@ -2349,6 +2391,20 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                             // Accept a wide vertical window so fast-falling frames don't tunnel through
                             if (feetY <= topY + 500 && feetY >= topY - 120)
                                 currentFloorY = Math.max(currentFloorY, topY + USER_HEIGHT);
+                        }
+                    } else if (obs.type === 'obb') {
+                        // OBB-local XZ test for "is the player standing over
+                        // the rock's footprint", then world-Y test for the
+                        // top surface (Y-only rotation means world top ==
+                        // OBB top).
+                        const dx = camera.position.x - obs.cx;
+                        const dz = camera.position.z - obs.cz;
+                        const lx = dx * obs.cosT - dz * obs.sinT;
+                        const lz = dx * obs.sinT + dz * obs.cosT;
+                        if (Math.abs(lx) < obs.hx + PR &&
+                            Math.abs(lz) < obs.hz + PR) {
+                            if (feetY >= obs.maxY - 5 && feetY <= obs.maxY + 200)
+                                currentFloorY = Math.max(currentFloorY, obs.maxY + USER_HEIGHT);
                         }
                     } else {
                         const b = obs.box;
