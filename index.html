@@ -72,85 +72,519 @@
             z-index: 100;
         }
 
-        /* Character menu — Tab to open. Hidden by default; we toggle the
-           .open class to fade it in. Pointer-events stay 'none' while
-           closed so it never intercepts clicks on the game canvas. */
+        /* ═══════════════════════════════════════════════════════════
+           CHARACTER MENU — Stylized RPG Pause Screen
+           ═══════════════════════════════════════════════════════════ */
+        @keyframes cm-shimmer {
+            0%,100% { box-shadow: 0 0 0 1px rgba(201,162,39,.18), 0 0 50px rgba(201,162,39,.07), inset 0 0 80px rgba(0,0,0,.6); }
+            50%      { box-shadow: 0 0 0 1px rgba(201,162,39,.32), 0 0 80px rgba(201,162,39,.16), inset 0 0 80px rgba(0,0,0,.6); }
+        }
+        @keyframes cm-slot-pulse {
+            0%,100% { opacity: .35; }
+            50%      { opacity: .6; }
+        }
+        @keyframes cm-fadein {
+            from { opacity:0; transform: translateY(8px); }
+            to   { opacity:1; transform: translateY(0); }
+        }
+
         #character-menu {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.85);
+            background: radial-gradient(ellipse at 50% 40%, rgba(8,8,28,.94) 0%, rgba(0,0,0,.98) 100%);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
             z-index: 200;
             display: flex;
             align-items: center;
             justify-content: center;
             font-family: 'Courier New', Courier, monospace;
-            color: #fff;
+            color: #e0d5c0;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.18s ease-out;
+            transition: opacity 0.22s ease-out;
         }
         #character-menu.open {
             opacity: 1;
             pointer-events: auto;
         }
+
+        /* ── Panel shell ── */
         #character-menu .cm-panel {
-            width: min(560px, 92vw);
-            max-height: 86vh;
+            position: relative;
+            width: min(720px, 96vw);
+            max-height: 92vh;
             overflow-y: auto;
-            border: 1px solid #fff;
-            padding: 28px 36px;
-            letter-spacing: 2px;
-            background: #000;
+            overflow-x: hidden;
+            background: linear-gradient(155deg, #0d0d1c 0%, #080810 55%, #0a0a12 100%);
+            border: 1px solid #c9a227;
+            padding: 36px 34px 26px;
+            animation: cm-shimmer 4s ease-in-out infinite;
         }
-        #character-menu .cm-header {
-            text-align: center;
-            font-size: 18px;
-            margin-bottom: 24px;
-            letter-spacing: 6px;
+        #character-menu.open .cm-panel {
+            animation: cm-fadein .28s ease-out both, cm-shimmer 4s ease-in-out .3s infinite;
         }
-        #character-menu .cm-section {
-            margin-bottom: 22px;
+
+        /* ── Corner ornaments ── */
+        .cm-corner {
+            position: absolute;
+            width: 20px; height: 20px;
+            border-color: #c9a227;
+            border-style: solid;
+            pointer-events: none;
         }
-        #character-menu .cm-portrait-wrap {
+        .cm-corner.tl { top:8px;    left:8px;  border-width: 2px 0 0 2px; }
+        .cm-corner.tr { top:8px;   right:8px;  border-width: 2px 2px 0 0; }
+        .cm-corner.bl { bottom:8px; left:8px;  border-width: 0 0 2px 2px; }
+        .cm-corner.br { bottom:8px;right:8px;  border-width: 0 2px 2px 0; }
+
+        /* ── Header ── */
+        .cm-header {
             display: flex;
-            justify-content: center;
-            margin: 4px 0 22px;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 28px;
+            letter-spacing: 9px;
+            font-size: 14px;
+            color: #c9a227;
+            text-shadow: 0 0 24px rgba(201,162,39,.55);
+            white-space: nowrap;
         }
+        .cm-header-line {
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(201,162,39,.5) 50%, transparent);
+        }
+
+        /* ── Two-column main layout ── */
+        .cm-main {
+            display: flex;
+            gap: 26px;
+            margin-bottom: 26px;
+            align-items: flex-start;
+        }
+
+        /* ── Portrait column ── */
+        .cm-portrait-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            flex-shrink: 0;
+        }
+        .cm-portrait-frame {
+            position: relative;
+            padding: 5px;
+            background: linear-gradient(135deg, #141008 0%, #0a0a18 100%);
+            border: 1px solid rgba(201,162,39,.45);
+            box-shadow: 0 0 28px rgba(201,162,39,.1), inset 0 0 24px rgba(0,0,0,.7);
+        }
+        /* inner corner ticks on portrait */
+        .cm-portrait-frame::before,
+        .cm-portrait-frame::after {
+            content: '';
+            position: absolute;
+            width: 10px; height: 10px;
+            border-color: #c9a227;
+            border-style: solid;
+            opacity: .6;
+        }
+        .cm-portrait-frame::before { top:2px;    left:2px;  border-width:1px 0 0 1px; }
+        .cm-portrait-frame::after  { bottom:2px; right:2px; border-width:0 1px 1px 0; }
+
         #character-menu #cm-portrait {
-            width: 220px;
-            height: 260px;
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            background: #050505;
+            width: 188px;
+            height: 232px;
             display: block;
+            background: #01010a;
         }
-        #character-menu .cm-section-title {
-            font-size: 13px;
-            opacity: 0.7;
-            margin-bottom: 10px;
-            border-bottom: 1px dashed rgba(255, 255, 255, 0.3);
-            padding-bottom: 6px;
+        .cm-portrait-label {
+            text-align: center;
+            font-size: 10px;
+            letter-spacing: 6px;
+            color: #c9a227;
+            padding: 7px 0 2px;
+            opacity: .75;
         }
-        #character-menu .cm-row {
+
+        /* HP / SP bars */
+        .cm-bars {
+            width: 198px;
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+        }
+        .cm-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 9px;
+            letter-spacing: 2px;
+        }
+        .cm-bar-label { color:#c9a227; width:18px; opacity:.85; }
+        .cm-bar-track {
+            flex:1;
+            height: 5px;
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.1);
+            overflow: hidden;
+        }
+        .cm-bar-fill { height:100%; transition: width .35s ease; }
+        .cm-bar-fill.hp {
+            background: linear-gradient(to right, #8c1a1a, #e03535);
+            box-shadow: 0 0 8px rgba(224,53,53,.6);
+        }
+        .cm-bar-fill.sp {
+            background: linear-gradient(to right, #1540a0, #3a8aff);
+            box-shadow: 0 0 8px rgba(58,138,255,.5);
+        }
+        .cm-bar-val { font-size:9px; opacity:.5; min-width:54px; text-align:right; }
+
+        /* ── Stats column ── */
+        .cm-stats-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .cm-stat-block {
+            border: 1px solid rgba(201,162,39,.18);
+            padding: 13px 16px;
+            background: rgba(201,162,39,.025);
+            position: relative;
+        }
+        .cm-stat-block::before {
+            content: '';
+            position: absolute;
+            top:0; left:0; right:0;
+            height:1px;
+            background: linear-gradient(to right, transparent, rgba(201,162,39,.35) 50%, transparent);
+        }
+        .cm-stat-title {
+            font-size: 9px;
+            letter-spacing: 5px;
+            color: #c9a227;
+            opacity: .65;
+            margin-bottom: 11px;
+            padding-bottom: 7px;
+            border-bottom: 1px solid rgba(201,162,39,.18);
+        }
+        .cm-stat-row {
             display: flex;
             justify-content: space-between;
+            font-size: 12px;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,.04);
+            letter-spacing: 2px;
+        }
+        .cm-stat-row:last-child { border-bottom: none; }
+        .cm-stat-row span:first-child { opacity:.45; font-size:10px; }
+        .cm-stat-row span:last-child  { color:#e0d5c0; }
+
+        /* ── Power-up item slots ── */
+        .cm-items-section {
+            border-top: 1px solid rgba(201,162,39,.2);
+            padding-top: 22px;
+            margin-bottom: 4px;
+        }
+        .cm-items-title {
+            font-size: 10px;
+            letter-spacing: 6px;
+            color: #c9a227;
+            opacity: .6;
+            text-align: center;
+            margin-bottom: 18px;
+        }
+        .cm-item-slots {
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+        }
+        .cm-item-slot {
+            width: 74px;
+            height: 74px;
+            border: 1px solid rgba(201,162,39,.35);
+            background: linear-gradient(135deg, #0c0c1a 0%, #080810 100%);
+            position: relative;
+            cursor: pointer;
+            transition: border-color .2s, box-shadow .2s, background .2s;
+            flex-shrink: 0;
+        }
+        .cm-item-slot:hover {
+            border-color: #c9a227;
+            background: linear-gradient(135deg, #131306, #0d0d08);
+            box-shadow: 0 0 20px rgba(201,162,39,.22), inset 0 0 18px rgba(201,162,39,.06);
+        }
+        /* corner ticks on each slot */
+        .cm-item-slot::before, .cm-item-slot::after {
+            content: '';
+            position: absolute;
+            width: 9px; height: 9px;
+            border-color: #c9a227;
+            border-style: solid;
+            opacity: .45;
+            transition: opacity .2s;
+        }
+        .cm-item-slot::before { top:3px;    left:3px;  border-width:1px 0 0 1px; }
+        .cm-item-slot::after  { bottom:3px; right:3px; border-width:0 1px 1px 0; }
+        .cm-item-slot:hover::before,
+        .cm-item-slot:hover::after { opacity:.9; }
+
+        .cm-slot-inner {
+            width:100%; height:100%;
+            display:flex; align-items:center; justify-content:center;
+            position:relative;
+        }
+        .cm-slot-icon {
+            font-size: 26px;
+            opacity: .18;
+            animation: cm-slot-pulse 3.5s ease-in-out infinite;
+        }
+        .cm-slot-num {
+            position: absolute;
+            bottom: 4px; right: 7px;
+            font-size: 9px;
+            letter-spacing: 1px;
+            color: #c9a227;
+            opacity: .4;
+        }
+
+        /* ── Footer ── */
+        .cm-footer {
+            text-align: center;
+            font-size: 10px;
+            letter-spacing: 5px;
+            color: #c9a227;
+            opacity: .3;
+            margin-top: 22px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           SETTINGS MENU
+           ═══════════════════════════════════════════════════════════ */
+        @keyframes sm-fadein {
+            from { opacity:0; transform: scale(.97); }
+            to   { opacity:1; transform: scale(1); }
+        }
+
+        #settings-menu {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% 40%, rgba(10,5,25,.95) 0%, rgba(0,0,0,.98) 100%);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            z-index: 210;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Courier New', Courier, monospace;
+            color: #e0d5c0;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.22s ease-out;
+        }
+        #settings-menu.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #settings-menu .sm-panel {
+            position: relative;
+            width: min(560px, 94vw);
+            max-height: 92vh;
+            overflow-y: auto;
+            background: linear-gradient(155deg, #0e0b1c 0%, #08080f 55%, #0b0a14 100%);
+            border: 1px solid #8a6aff;
+            padding: 34px 34px 26px;
+            box-shadow:
+                0 0 0 1px rgba(138,106,255,.18),
+                0 0 60px rgba(138,106,255,.1),
+                inset 0 0 80px rgba(0,0,0,.6);
+            animation: cm-shimmer 4s ease-in-out infinite;
+        }
+        #settings-menu.open .sm-panel {
+            animation: sm-fadein .26s ease-out both, sm-shimmer 4s ease-in-out .28s infinite;
+        }
+        @keyframes sm-shimmer {
+            0%,100% { box-shadow: 0 0 0 1px rgba(138,106,255,.18), 0 0 60px rgba(138,106,255,.1), inset 0 0 80px rgba(0,0,0,.6); }
+            50%      { box-shadow: 0 0 0 1px rgba(138,106,255,.3),  0 0 90px rgba(138,106,255,.2), inset 0 0 80px rgba(0,0,0,.6); }
+        }
+
+        /* Corner ornaments — purple tint */
+        #settings-menu .sm-corner {
+            position: absolute;
+            width: 20px; height: 20px;
+            border-color: #8a6aff;
+            border-style: solid;
+        }
+        #settings-menu .sm-corner.tl { top:8px;    left:8px;  border-width:2px 0 0 2px; }
+        #settings-menu .sm-corner.tr { top:8px;   right:8px;  border-width:2px 2px 0 0; }
+        #settings-menu .sm-corner.bl { bottom:8px; left:8px;  border-width:0 0 2px 2px; }
+        #settings-menu .sm-corner.br { bottom:8px;right:8px;  border-width:0 2px 2px 0; }
+
+        /* Header */
+        .sm-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 30px;
+            letter-spacing: 9px;
             font-size: 14px;
-            padding: 4px 0;
+            color: #8a6aff;
+            text-shadow: 0 0 24px rgba(138,106,255,.6);
+            white-space: nowrap;
         }
-        #character-menu .cm-row span:last-child {
-            opacity: 0.85;
+        .sm-header-line {
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(138,106,255,.5) 50%, transparent);
         }
-        #character-menu .cm-empty {
-            font-size: 13px;
-            opacity: 0.5;
-            text-align: center;
+
+        /* Section blocks */
+        .sm-section {
+            border: 1px solid rgba(138,106,255,.18);
+            background: rgba(138,106,255,.025);
+            padding: 14px 18px;
+            margin-bottom: 16px;
+            position: relative;
+        }
+        .sm-section::before {
+            content: '';
+            position: absolute;
+            top:0; left:0; right:0;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(138,106,255,.4) 50%, transparent);
+        }
+        .sm-section-title {
+            font-size: 9px;
+            letter-spacing: 5px;
+            color: #8a6aff;
+            opacity: .7;
+            margin-bottom: 14px;
+            padding-bottom: 7px;
+            border-bottom: 1px solid rgba(138,106,255,.18);
+        }
+
+        /* Setting rows */
+        .sm-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,.04);
+            gap: 16px;
         }
-        #character-menu .cm-footer {
-            text-align: center;
+        .sm-row:last-child { border-bottom: none; padding-bottom: 0; }
+        .sm-row-label {
             font-size: 11px;
-            opacity: 0.55;
-            margin-top: 18px;
             letter-spacing: 3px;
+            opacity: .7;
+            flex-shrink: 0;
+        }
+        .sm-row-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .sm-val {
+            font-size: 11px;
+            letter-spacing: 2px;
+            color: #8a6aff;
+            min-width: 36px;
+            text-align: right;
+            opacity: .9;
+        }
+
+        /* Sliders */
+        .sm-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 160px;
+            height: 3px;
+            background: rgba(255,255,255,.1);
+            border: none;
+            outline: none;
+            border-radius: 0;
+            cursor: pointer;
+        }
+        .sm-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px; height: 14px;
+            background: #8a6aff;
+            border: none;
+            border-radius: 0;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(138,106,255,.7);
+        }
+        .sm-slider::-moz-range-thumb {
+            width: 14px; height: 14px;
+            background: #8a6aff;
+            border: none;
+            border-radius: 0;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(138,106,255,.7);
+        }
+        .sm-slider::-webkit-slider-runnable-track {
+            height: 3px;
+            background: linear-gradient(to right, rgba(138,106,255,.7) var(--pct,50%), rgba(255,255,255,.1) var(--pct,50%));
+        }
+
+        /* Toggle buttons (quality, fullscreen) */
+        .sm-btn-group {
+            display: flex;
+            gap: 6px;
+        }
+        .sm-btn {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 10px;
+            letter-spacing: 3px;
+            color: rgba(138,106,255,.6);
+            background: rgba(138,106,255,.06);
+            border: 1px solid rgba(138,106,255,.25);
+            padding: 5px 12px;
+            cursor: pointer;
+            transition: all .15s;
+            text-transform: uppercase;
+        }
+        .sm-btn:hover { border-color: #8a6aff; color: #8a6aff; background: rgba(138,106,255,.12); }
+        .sm-btn.active {
+            background: rgba(138,106,255,.22);
+            border-color: #8a6aff;
+            color: #c4b4ff;
+            box-shadow: 0 0 12px rgba(138,106,255,.3);
+        }
+
+        /* Resume button */
+        .sm-resume {
+            display: block;
+            width: 100%;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 11px;
+            letter-spacing: 6px;
+            color: #8a6aff;
+            background: rgba(138,106,255,.07);
+            border: 1px solid rgba(138,106,255,.35);
+            padding: 12px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all .18s;
+            text-transform: uppercase;
+            text-align: center;
+        }
+        .sm-resume:hover {
+            background: rgba(138,106,255,.16);
+            border-color: #8a6aff;
+            box-shadow: 0 0 20px rgba(138,106,255,.2);
+            color: #c4b4ff;
+        }
+
+        .sm-footer {
+            text-align: center;
+            font-size: 10px;
+            letter-spacing: 5px;
+            color: #8a6aff;
+            opacity: .3;
+            margin-top: 18px;
         }
     </style>
 </head>
@@ -168,41 +602,297 @@
 
     <div id="ui">WASD TO MOVE | SPACE TO JUMP | TAB FOR CHARACTER</div>
 
-    <!-- Character menu (Tab toggles, Esc closes). Static placeholder
+    <!-- Click spark canvas — sits above all menus, pointer-events:none -->
+    <canvas id="spark-canvas" style="
+        position:fixed; inset:0;
+        width:100%; height:100%;
+        pointer-events:none;
+        z-index:999;
+    "></canvas>
          content — wire real values into the .cm-row right-side spans
          once you have stat/inventory state. -->
     <div id="character-menu">
         <div class="cm-panel">
-            <div class="cm-header">━ CHARACTER ━</div>
 
-            <div class="cm-portrait-wrap">
-                <canvas id="cm-portrait" width="220" height="260"></canvas>
+            <!-- Corner ornaments -->
+            <div class="cm-corner tl"></div>
+            <div class="cm-corner tr"></div>
+            <div class="cm-corner bl"></div>
+            <div class="cm-corner br"></div>
+
+            <!-- Header -->
+            <div class="cm-header">
+                <div class="cm-header-line"></div>
+                ◈ &nbsp; CHARACTER &nbsp; ◈
+                <div class="cm-header-line"></div>
             </div>
 
-            <div class="cm-section">
-                <div class="cm-section-title">[ KNIGHT ]</div>
-                <div class="cm-row"><span>HP</span><span>100 / 100</span></div>
-                <div class="cm-row"><span>STAMINA</span><span>100 / 100</span></div>
-                <div class="cm-row"><span>LEVEL</span><span>1</span></div>
-                <div class="cm-row"><span>XP</span><span>0 / 100</span></div>
+            <!-- Main: portrait left · stats right -->
+            <div class="cm-main">
+
+                <!-- Portrait column -->
+                <div class="cm-portrait-col">
+                    <div class="cm-portrait-frame">
+                        <canvas id="cm-portrait" width="220" height="260"></canvas>
+                        <div class="cm-portrait-label">K N I G H T</div>
+                    </div>
+                    <!-- HP / Stamina bars -->
+                    <div class="cm-bars">
+                        <div class="cm-bar-row">
+                            <span class="cm-bar-label">HP</span>
+                            <div class="cm-bar-track"><div class="cm-bar-fill hp" style="width:100%"></div></div>
+                            <span class="cm-bar-val">100 / 100</span>
+                        </div>
+                        <div class="cm-bar-row">
+                            <span class="cm-bar-label">SP</span>
+                            <div class="cm-bar-track"><div class="cm-bar-fill sp" style="width:100%"></div></div>
+                            <span class="cm-bar-val">100 / 100</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats column -->
+                <div class="cm-stats-col">
+                    <div class="cm-stat-block">
+                        <div class="cm-stat-title">S T A T S</div>
+                        <div class="cm-stat-row"><span>LEVEL</span><span>1</span></div>
+                        <div class="cm-stat-row"><span>XP</span><span>0 / 100</span></div>
+                        <div class="cm-stat-row"><span>ATK</span><span>12</span></div>
+                        <div class="cm-stat-row"><span>DEF</span><span>8</span></div>
+                        <div class="cm-stat-row"><span>SPD</span><span>10</span></div>
+                    </div>
+                    <div class="cm-stat-block">
+                        <div class="cm-stat-title">E Q U I P M E N T</div>
+                        <div class="cm-stat-row"><span>HEAD</span><span>—</span></div>
+                        <div class="cm-stat-row"><span>BODY</span><span>—</span></div>
+                        <div class="cm-stat-row"><span>WEAPON</span><span>—</span></div>
+                        <div class="cm-stat-row"><span>OFFHAND</span><span>—</span></div>
+                    </div>
+                </div>
+
+            </div><!-- /.cm-main -->
+
+            <!-- Power-up item slots -->
+            <div class="cm-items-section">
+                <div class="cm-items-title">◦ &nbsp; P O W E R - U P S &nbsp; ◦</div>
+                <div class="cm-item-slots">
+                    <div class="cm-item-slot">
+                        <div class="cm-slot-inner">
+                            <span class="cm-slot-icon">✦</span>
+                            <span class="cm-slot-num">1</span>
+                        </div>
+                    </div>
+                    <div class="cm-item-slot">
+                        <div class="cm-slot-inner">
+                            <span class="cm-slot-icon">✦</span>
+                            <span class="cm-slot-num">2</span>
+                        </div>
+                    </div>
+                    <div class="cm-item-slot">
+                        <div class="cm-slot-inner">
+                            <span class="cm-slot-icon">✦</span>
+                            <span class="cm-slot-num">3</span>
+                        </div>
+                    </div>
+                    <div class="cm-item-slot">
+                        <div class="cm-slot-inner">
+                            <span class="cm-slot-icon">✦</span>
+                            <span class="cm-slot-num">4</span>
+                        </div>
+                    </div>
+                    <div class="cm-item-slot">
+                        <div class="cm-slot-inner">
+                            <span class="cm-slot-icon">✦</span>
+                            <span class="cm-slot-num">5</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="cm-section">
-                <div class="cm-section-title">[ EQUIPMENT ]</div>
-                <div class="cm-row"><span>HEAD</span><span>—</span></div>
-                <div class="cm-row"><span>BODY</span><span>—</span></div>
-                <div class="cm-row"><span>WEAPON</span><span>—</span></div>
-                <div class="cm-row"><span>OFFHAND</span><span>—</span></div>
+            <div class="cm-footer">[ TAB ] &nbsp;·&nbsp; [ ESC ] &nbsp; CLOSE</div>
+
+        </div><!-- /.cm-panel -->
+    </div><!-- /#character-menu -->
+
+    <!-- Settings menu (Esc opens, Esc/button closes) -->
+    <div id="settings-menu">
+        <div class="sm-panel">
+
+            <div class="sm-corner tl"></div>
+            <div class="sm-corner tr"></div>
+            <div class="sm-corner bl"></div>
+            <div class="sm-corner br"></div>
+
+            <div class="sm-header">
+                <div class="sm-header-line"></div>
+                ⬡ &nbsp; S E T T I N G S &nbsp; ⬡
+                <div class="sm-header-line"></div>
             </div>
 
-            <div class="cm-section">
-                <div class="cm-section-title">[ INVENTORY ]</div>
-                <div class="cm-empty">— EMPTY —</div>
+            <!-- AUDIO -->
+            <div class="sm-section">
+                <div class="sm-section-title">A U D I O</div>
+                <div class="sm-row">
+                    <span class="sm-row-label">MUSIC VOLUME</span>
+                    <div class="sm-row-control">
+                        <input type="range" class="sm-slider" id="sm-music-vol" min="0" max="100" value="30">
+                        <span class="sm-val" id="sm-music-vol-val">30%</span>
+                    </div>
+                </div>
             </div>
 
-            <div class="cm-footer">[TAB] / [ESC] CLOSE</div>
+            <!-- CONTROLS -->
+            <div class="sm-section">
+                <div class="sm-section-title">C O N T R O L S</div>
+                <div class="sm-row">
+                    <span class="sm-row-label">MOUSE SENSITIVITY</span>
+                    <div class="sm-row-control">
+                        <input type="range" class="sm-slider" id="sm-sensitivity" min="1" max="10" value="5" step="1">
+                        <span class="sm-val" id="sm-sensitivity-val">5</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GRAPHICS -->
+            <div class="sm-section">
+                <div class="sm-section-title">G R A P H I C S</div>
+                <div class="sm-row">
+                    <span class="sm-row-label">FIELD OF VIEW</span>
+                    <div class="sm-row-control">
+                        <input type="range" class="sm-slider" id="sm-fov" min="50" max="110" value="60" step="5">
+                        <span class="sm-val" id="sm-fov-val">60°</span>
+                    </div>
+                </div>
+                <div class="sm-row">
+                    <span class="sm-row-label">RENDER QUALITY</span>
+                    <div class="sm-row-control sm-btn-group" id="sm-quality-group">
+                        <button class="sm-btn" data-q="low">LOW</button>
+                        <button class="sm-btn active" data-q="med">MED</button>
+                        <button class="sm-btn" data-q="high">HIGH</button>
+                    </div>
+                </div>
+                <div class="sm-row">
+                    <span class="sm-row-label">FULLSCREEN</span>
+                    <div class="sm-row-control sm-btn-group">
+                        <button class="sm-btn" id="sm-fullscreen-btn">ENTER</button>
+                    </div>
+                </div>
+            </div>
+
+            <button class="sm-resume" id="sm-resume-btn">▶ &nbsp; RESUME GAME</button>
+            <div class="sm-footer">[ ESC ] CLOSE</div>
+
         </div>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         CLICK SPARK ENGINE
+         Faithful port of the ReactBits ClickSpark effect.
+         Fires on clicks inside #character-menu or #settings-menu.
+         Gold sparks for character menu, purple for settings.
+         ═══════════════════════════════════════════════════════════ -->
+    <script>
+    (function() {
+        const sparkCanvas = document.getElementById('spark-canvas');
+        const sCtx = sparkCanvas.getContext('2d');
+
+        // Resize the spark canvas to always match viewport
+        function resizeSparkCanvas() {
+            sparkCanvas.width  = window.innerWidth;
+            sparkCanvas.height = window.innerHeight;
+        }
+        resizeSparkCanvas();
+        window.addEventListener('resize', resizeSparkCanvas);
+
+        // Active spark bursts — each burst is one click
+        const bursts = [];
+
+        // Config
+        const SPARK_COUNT   = 10;   // spokes per burst
+        const SPARK_SIZE    = 2.2;  // line thickness
+        const SPARK_LENGTH  = 20;   // max spoke length (px)
+        const BURST_DURATION = 500; // ms until fully faded
+
+        function spawnBurst(x, y, color) {
+            const sparks = [];
+            for (let i = 0; i < SPARK_COUNT; i++) {
+                const angle = (2 * Math.PI / SPARK_COUNT) * i;
+                sparks.push({ angle, length: SPARK_LENGTH * (0.6 + Math.random() * 0.4) });
+            }
+            bursts.push({ x, y, color, sparks, startTime: performance.now() });
+            if (!_sparkRafRunning) _sparkLoop();
+        }
+
+        let _sparkRafRunning = false;
+        function _sparkLoop() {
+            _sparkRafRunning = true;
+            sCtx.clearRect(0, 0, sparkCanvas.width, sparkCanvas.height);
+
+            const now = performance.now();
+            let anyAlive = false;
+
+            for (let b = bursts.length - 1; b >= 0; b--) {
+                const burst = bursts[b];
+                const elapsed = now - burst.startTime;
+                if (elapsed >= BURST_DURATION) { bursts.splice(b, 1); continue; }
+
+                // t: 0 → 1 over the burst lifetime
+                const t = elapsed / BURST_DURATION;
+                // ease out: sparks fly fast then slow
+                const eased = 1 - Math.pow(1 - t, 3);
+                const alpha = 1 - t;
+
+                sCtx.save();
+                sCtx.globalAlpha = alpha;
+                sCtx.strokeStyle = burst.color;
+                sCtx.lineWidth   = SPARK_SIZE * (1 - t * 0.5); // thin slightly as they fade
+                sCtx.lineCap     = 'round';
+
+                for (const spark of burst.sparks) {
+                    // Inner gap + outward travel
+                    const gap   = 8  + eased * 14;
+                    const reach = gap + eased * spark.length;
+
+                    const cos = Math.cos(spark.angle);
+                    const sin = Math.sin(spark.angle);
+
+                    sCtx.beginPath();
+                    sCtx.moveTo(burst.x + cos * gap,   burst.y + sin * gap);
+                    sCtx.lineTo(burst.x + cos * reach,  burst.y + sin * reach);
+                    sCtx.stroke();
+                }
+
+                sCtx.restore();
+                anyAlive = true;
+            }
+
+            if (anyAlive) {
+                requestAnimationFrame(_sparkLoop);
+            } else {
+                sCtx.clearRect(0, 0, sparkCanvas.width, sparkCanvas.height);
+                _sparkRafRunning = false;
+            }
+        }
+
+        // Listen for clicks on both menus
+        function menuClickHandler(color) {
+            return function(e) {
+                spawnBurst(e.clientX, e.clientY, color);
+            };
+        }
+
+        // Wait for DOM ready, then attach
+        document.addEventListener('DOMContentLoaded', function() {
+            const charMenu = document.getElementById('character-menu');
+            const settMenu = document.getElementById('settings-menu');
+            if (charMenu) charMenu.addEventListener('click', menuClickHandler('#c9a227')); // gold
+            if (settMenu) settMenu.addEventListener('click', menuClickHandler('#8a6aff')); // purple
+        });
+
+        // Also expose so module script can call it if needed
+        window.spawnClickSpark = spawnBurst;
+    })();
+    </script>
 
     <script type="importmap">
         {
@@ -4622,7 +5312,7 @@ const s = Math.sin(angle); const c = Math.cos(angle);
         // Skip while the character menu is open — clicking on the menu
         // shouldn't yank the cursor back into pointer-lock.
         document.addEventListener('click', () => { 
-            if(window.worldActive && !controls.isLocked && !window.menuOpen) controls.lock(); 
+            if(window.worldActive && !controls.isLocked && !window.menuOpen && !window.settingsOpen) controls.lock(); 
         });
 
         // --- FIRST-PERSON KNIGHT BODY ---
@@ -4982,6 +5672,7 @@ const s = Math.sin(angle); const c = Math.cos(angle);
             // Drop any held movement keys so the player stops dead.
             for (const k in keys) keys[k] = 0;
             // Release the cursor so the user can actually use the menu.
+            _deliberateUnlock = true;
             if (controls.isLocked) controls.unlock();
             // Kick off the portrait render loop (self-terminates when
             // menuOpen flips false). Guarded so re-opens don't stack.
@@ -5002,11 +5693,143 @@ const s = Math.sin(angle); const c = Math.cos(angle);
         document.addEventListener('keydown', e => {
             if (e.key === 'Tab') {
                 e.preventDefault();
-                if (window.menuOpen) closeCharacterMenu();
+                if (window.settingsOpen) closeSettingsMenu();
+                else if (window.menuOpen) closeCharacterMenu();
                 else openCharacterMenu();
-            } else if (e.key === 'Escape' && window.menuOpen) {
-                closeCharacterMenu();
+            } else if (e.key === 'Escape') {
+                if (window.menuOpen) closeCharacterMenu();
+                else if (window.settingsOpen) closeSettingsMenu();
+                // pointer-lock exit is handled by the 'unlock' event below
             }
+        });
+
+        // ── SETTINGS MENU ──────────────────────────────────────────
+        window.settingsOpen = false;
+        const settingsMenuEl = document.getElementById('settings-menu');
+
+        // Track whether WE unlocked the camera (so we don't open
+        // settings when the unlock was intentional — e.g. Tab menu).
+        let _deliberateUnlock = false;
+
+        // When pointer lock exits because the user pressed Esc, the
+        // browser consumes that keypress and fires the 'unlock' event
+        // instead of a keydown. Listen here so one Esc is enough.
+        controls.addEventListener('unlock', () => {
+            if (!_deliberateUnlock && window.worldActive && !window.menuOpen && !window.settingsOpen) {
+                openSettingsMenu();
+            }
+            _deliberateUnlock = false;
+        });
+
+        function openSettingsMenu() {
+            if (window.settingsOpen) return;
+            window.settingsOpen = true;
+            settingsMenuEl.classList.add('open');
+            for (const k in keys) keys[k] = 0;
+            _deliberateUnlock = true;
+            if (controls.isLocked) controls.unlock();
+        }
+        function closeSettingsMenu() {
+            if (!window.settingsOpen) return;
+            window.settingsOpen = false;
+            settingsMenuEl.classList.remove('open');
+            if (window.worldActive) {
+                try { controls.lock(); } catch (_) {}
+            }
+        }
+
+        // Also block movement input while settings are open
+        document.addEventListener('keydown', e => {
+            if (window.settingsOpen) {
+                const consumed = ['w','a','s','d',' ','arrowup','arrowdown','arrowleft','arrowright'];
+                if (consumed.includes(e.key.toLowerCase())) e.preventDefault();
+            }
+        }, { capture: true });
+
+        // Resume button
+        document.getElementById('sm-resume-btn').addEventListener('click', closeSettingsMenu);
+
+        // ── SETTINGS: music volume ──────────────────────────────────
+        const musicEl  = document.getElementById('gameMusic');
+        const volSlider = document.getElementById('sm-music-vol');
+        const volVal    = document.getElementById('sm-music-vol-val');
+        function updateSliderTrack(slider) {
+            const pct = ((slider.value - slider.min) / (slider.max - slider.min) * 100).toFixed(1) + '%';
+            slider.style.setProperty('--pct', pct);
+        }
+        volSlider.addEventListener('input', () => {
+            const v = parseInt(volSlider.value);
+            volVal.textContent = v + '%';
+            if (musicEl) musicEl.volume = v / 100;
+            updateSliderTrack(volSlider);
+        });
+        updateSliderTrack(volSlider);
+
+        // ── SETTINGS: mouse sensitivity ─────────────────────────────
+        // PointerLockControls exposes .pointerSpeed (default 1.0).
+        // We map slider 1–10 → 0.2–2.0 linearly.
+        const sensSlider = document.getElementById('sm-sensitivity');
+        const sensVal    = document.getElementById('sm-sensitivity-val');
+        sensSlider.addEventListener('input', () => {
+            const v = parseInt(sensSlider.value);
+            sensVal.textContent = v;
+            controls.pointerSpeed = v * 0.2;
+            updateSliderTrack(sensSlider);
+        });
+        updateSliderTrack(sensSlider);
+
+        // ── SETTINGS: field of view ─────────────────────────────────
+        const fovSlider = document.getElementById('sm-fov');
+        const fovVal    = document.getElementById('sm-fov-val');
+        fovSlider.addEventListener('input', () => {
+            const v = parseInt(fovSlider.value);
+            fovVal.textContent = v + '°';
+            camera.fov = v;
+            camera.updateProjectionMatrix();
+            updateSliderTrack(fovSlider);
+        });
+        updateSliderTrack(fovSlider);
+
+        // ── SETTINGS: render quality ────────────────────────────────
+        // Low = 4× scale (blocky), Med = 2.5× (default), High = 1× (native)
+        const qualityMap = { low: 4, med: 2.5, high: 1 };
+        let currentPixelScale = 2.5;
+        document.getElementById('sm-quality-group').addEventListener('click', e => {
+            const btn = e.target.closest('.sm-btn[data-q]');
+            if (!btn) return;
+            const q = btn.dataset.q;
+            document.querySelectorAll('#sm-quality-group .sm-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentPixelScale = qualityMap[q];
+            renderer.setSize(
+                window.innerWidth  / currentPixelScale,
+                window.innerHeight / currentPixelScale,
+                false
+            );
+        });
+        // Keep quality in sync on window resize
+        window.addEventListener('resize', () => {
+            renderer.setSize(
+                window.innerWidth  / currentPixelScale,
+                window.innerHeight / currentPixelScale,
+                false
+            );
+        });
+
+        // ── SETTINGS: fullscreen ────────────────────────────────────
+        document.getElementById('sm-fullscreen-btn').addEventListener('click', () => {
+            const btn = document.getElementById('sm-fullscreen-btn');
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+                btn.textContent = 'EXIT';
+            } else {
+                document.exitFullscreen().catch(() => {});
+                btn.textContent = 'ENTER';
+            }
+        });
+        document.addEventListener('fullscreenchange', () => {
+            const btn = document.getElementById('sm-fullscreen-btn');
+            if (btn) btn.textContent = document.fullscreenElement ? 'EXIT' : 'ENTER';
         });
 
 // --- COLLISION SETUP ---
