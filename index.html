@@ -26,7 +26,7 @@
             position: absolute; top: 0; left: 0;
             width: 100vw; height: 100vh;
             opacity: 0;
-            transition: opacity 2s ease-in-out;
+            transition: opacity 4s ease-out;
             z-index: 1;
         }
         #three-layer canvas { 
@@ -45,7 +45,7 @@
             display: block; /* Removed flex centering to prevent gaps */
             z-index: 2;
             background: #000;
-            transition: opacity 2s ease-in-out;
+            transition: opacity 4s ease-out;
         }
         
         #ascii-canvas { cursor: crosshair; }
@@ -562,6 +562,11 @@
             border-radius: 0;
             cursor: pointer;
             box-shadow: 0 0 10px rgba(138,106,255,.7);
+            /* Center the 14px thumb on the 3px track. WebKit aligns
+               the thumb to the top of the input box, not the track,
+               when appearance:none is set — needs explicit offset of
+               (track_height - thumb_height) / 2 = -5.5px. */
+            margin-top: -5.5px;
         }
         .sm-slider::-moz-range-thumb {
             width: 14px; height: 14px;
@@ -1003,6 +1008,12 @@ if (isMobileDevice) {
         let cellW = 12, cellH = 17, fontSize = 18;
         let cols, rows, heatGrid, smudgeGrid, mask, visibleGrid;
         let mouse = { x: -100, y: -100, lastX: -100, lastY: -100, vx: 0, vy: 0 };
+        // Ripple sources dropped along the cursor path. Each entry is
+        // {x, y, t(ms)}. Stationary mouse adds no entries (no effect).
+        // Each drop emits an expanding ring that fades over its lifetime
+        // — together they form a short trail behind the cursor.
+        const mouseTrail = [];
+        let lastDropTime = 0;
         let currentRotation = 0, colorPhase = 0;
 
         let isFalling = false;
@@ -1106,11 +1117,23 @@ if (isMobileDevice) {
             // positions even during the crumble/fall sequence.
             fluidMousePx = e.clientX;
             fluidMousePy = e.clientY;
-            if (isFalling) return; 
+            if (isFalling) return;
             mouse.x = (e.clientX / window.innerWidth) * cols;
             mouse.y = (e.clientY / window.innerHeight) * rows;
             mouse.vx = mouse.x - mouse.lastX;
             mouse.vy = mouse.y - mouse.lastY;
+
+            // Drop a ripple source on motion. Speed gate (>0.3 cells)
+            // ensures stationary mouse adds nothing; time gate (40ms)
+            // throttles drop frequency so a fast swipe doesn't flood
+            // the trail with hundreds of overlapping rings.
+            const nowMs = Date.now();
+            const moveSpeed = Math.sqrt(mouse.vx*mouse.vx + mouse.vy*mouse.vy);
+            if (moveSpeed > 0.3 && nowMs - lastDropTime > 40) {
+                mouseTrail.push({ x: mouse.x, y: mouse.y, t: nowMs });
+                lastDropTime = nowMs;
+                if (mouseTrail.length > 80) mouseTrail.shift();
+            }
         });
 
         canvas.addEventListener('click', (e) => {
@@ -1132,7 +1155,11 @@ if (isMobileDevice) {
                 music.volume = 0.3; // Sets volume to 30%
                 music.play().catch(e => console.log("Audio waiting for user interaction"));
             }
-                if (window.lockCamera) window.lockCamera();
+                // Pointer-lock request is deferred until after the crumble.
+                // controls.lock() triggers a browser fullscreen-pointer
+                // transition that idles the main thread for ~1 second,
+                // which used to freeze the ASCII crumble mid-animation.
+                // Now we lock right when the world reveal begins.
 
                 const time = Date.now() * 0.0003;
                 for (let y = 0; y < rows; y++) {
@@ -1152,16 +1179,17 @@ if (isMobileDevice) {
                 }
                 isFalling = true;
                 // Click → world reveal. 2600ms wait lets the crumble play
-                // out fully, then both layers cross-fade over 2s (matching
+                // out fully, then both layers cross-fade over 4s (matching
                 // CSS transitions on #three-layer and #ascii-layer). The
-                // 2000ms ascii cleanup matches the fade duration so we
+                // 4000ms ascii cleanup matches the fade duration so we
                 // don't display:none the layer mid-fade.
                 setTimeout(() => {
                     document.getElementById('three-layer').style.opacity = '1';
                     document.getElementById('ui').style.opacity = '0.8';
                     document.getElementById('ascii-layer').style.opacity = '0';
                     window.worldActive = true;
-                    setTimeout(() => { document.getElementById('ascii-layer').style.display = 'none'; }, 2000);
+                    if (window.lockCamera) window.lockCamera();
+                    setTimeout(() => { document.getElementById('ascii-layer').style.display = 'none'; }, 4000);
                 }, 2600);
             }
         });
@@ -1233,17 +1261,37 @@ if (isMobileDevice) {
 
                     if (isVisible) {
                         if (!isFalling) {
-                            const dx = x - mouse.x, dy = y - mouse.y;
-                            const dist = Math.sqrt(dx*dx + dy*dy);
-                            const angle = Math.atan2(dy, dx) - currentRotation;
-                            const starShape = 0.3 + 0.7 * Math.pow(Math.abs(Math.cos(angle * 2.5)), 4);
-                            const starEffect = Math.max(0, (1 - dist / 10) * starShape); 
-                            const rippleEffect = Math.sin(dist * 0.45 - time * 18) * Math.max(0, 1 - dist / 60);
-                            const totalInfluence = (starEffect * 0.8) + (rippleEffect * 0.4);
+                            // Sum ring contributions from active trail
+                            // drops. Each drop emits a single ring that
+                            // expands outward over its lifetime, so the
+                            // cursor leaves a wake of ripples and a
+                            // short trail right behind it. Stationary
+                            // mouse → empty trail → no influence.
+                            let totalInfluence = 0;
+                            const nowMs = Date.now();
+                            const TRAIL_MAX_AGE = 2800; // ms — long trail
+                            const RING_SPEED = 0.012;   // cells/ms — rings expand slower → smaller max radius
+                            const RING_WIDTH = 0.55;    // very thin rings
+                            for (let i = 0; i < mouseTrail.length; i++) {
+                                const drop = mouseTrail[i];
+                                const age = nowMs - drop.t;
+                                if (age > TRAIL_MAX_AGE) continue;
+                                const dx = x - drop.x, dy = y - drop.y;
+                                const dist = Math.sqrt(dx*dx + dy*dy);
+                                const ringRadius = age * RING_SPEED;
+                                const offset = dist - ringRadius;
+                                // Bell curve around the expanding ring.
+                                const ring = Math.exp(-(offset*offset) / (RING_WIDTH*RING_WIDTH));
+                                // Quadratic age fade — recent drops are
+                                // brighter, so the freshest part of the
+                                // path reads as the "trail" right behind
+                                // the cursor.
+                                const fade = 1 - age / TRAIL_MAX_AGE;
+                                totalInfluence += ring * fade * fade;
+                            }
 
                             if (totalInfluence > 0.05) {
                                 smudgeGrid[idx] += (totalInfluence - smudgeGrid[idx]) * 0.2;
-                                if (dist < 1.1) heatGrid[idx] = 1.0;
                             }
                         }
 
@@ -1276,11 +1324,10 @@ if (isMobileDevice) {
                         const combinedWave = (w1 + w2) / 2;
                         const shimmer = Math.pow(Math.max(0, Math.sin(x * 0.5 + y * 0.3 + time * 8)), 10) * 40;
 
-                        const baseHue = (0 + colorPhase) % 360; 
+                        const baseHue = (0 + colorPhase) % 360;
                         const hue = baseHue + (s * 60) + (combinedWave * 10);
-                        let distForLight = isFalling ? 100 : Math.sqrt(Math.pow(x - mouse.x, 2) + Math.pow(y - mouse.y, 2));
-                        const lightness = 30 + (s * 75) + (h * 40) + (combinedWave * 10) + shimmer + (Math.max(0, (1 - distForLight / 15)) * 40);
-                        
+                        const lightness = 30 + (s * 75) + (h * 40) + (combinedWave * 10) + shimmer;
+
                         let char = "";
                         if (isFalling && fallOffsets[idx] > 10) {
                             // Degrade characters into smaller bits as they fall
@@ -1289,8 +1336,18 @@ if (isMobileDevice) {
                         } else if (h > 0.9) {
                             char = boldChars[Math.floor(Math.random() * boldChars.length)];
                         } else if (s > 0.15) {
-                            const sIdx = Math.floor((1 - s) * (smudgeChars.length - 1));
-                            char = smudgeChars[Math.max(0, Math.min(smudgeChars.length - 1, sIdx))];
+                            // Center index from smudge intensity. Window
+                            // of 7 + per-cell spatial hash gives varied
+                            // glyphs so a smudged region reads as ASCII
+                            // texture rather than a uniform character —
+                            // but high-smudge cells can still land on @
+                            // for that dense look.
+                            const center = Math.floor((1 - s) * (smudgeChars.length - 1));
+                            const hash = ((x * 73856093) ^ (y * 19349663)) >>> 0;
+                            const windowSize = 7;
+                            const offset = (hash % windowSize) - Math.floor(windowSize / 2);
+                            const sIdx = Math.max(0, Math.min(smudgeChars.length - 1, center + offset));
+                            char = smudgeChars[sIdx];
                         } else {
                             char = thinChars[Math.floor(((combinedWave + 1) / 2) * (thinChars.length - 1))];
                         }
@@ -1740,20 +1797,79 @@ if (isMobileDevice) {
 
         const SUN_DIR = new THREE.Vector3(0, 0.02, -1).normalize();
 
+        // Stylized procedural sky. Three-band vertical gradient
+        // (top→mid→bottom) plus a sun-direction halo that adds warmth
+        // around the sun. This is fast (a handful of math ops per pixel)
+        // and gives us a true cartoon-blue zenith with controlled horizon
+        // brightness, instead of fighting Preetham's physically-accurate
+        // white horizon. Day/night transitions come from the existing
+        // palette system swapping topColor/midColor/bottomColor + sunGlow.
+        //
+        // sunDir + sunGlow are wired in updateTimeOfDay each frame so the
+        // halo follows the sun. uSunPower controls halo strength
+        // (small at noon, larger at sunset for that golden hour feel).
         const skyGeo = new THREE.SphereGeometry(60000, 32, 32);
         const skyMat = new THREE.ShaderMaterial({
-            side: THREE.BackSide, depthWrite: false, 
+            side: THREE.BackSide, depthWrite: false,
             uniforms: {
-                topColor: { value: new THREE.Color(0x8a9db0) },
-                midColor: { value: new THREE.Color(0xffb59d) },
-                bottomColor: { value: new THREE.Color(0xffdec7) }
+                topColor:    { value: new THREE.Color(0x2a78d8) },
+                midColor:    { value: new THREE.Color(0x7ab8e8) },
+                bottomColor: { value: new THREE.Color(0xc2d6e3) },
+                sunDir:      { value: SUN_DIR },
+                // Hardcoded clean white — independent of palette sunGlow
+                // (which stays warm for the sun disc). The halo on the
+                // sky reads as bright atmospheric haze around the sun
+                // rather than a peach tint.
+                sunGlow:     { value: new THREE.Color(0xffffff) },
+                uSunPower:   { value: 0.35 }
             },
-            vertexShader: `varying vec3 vWorldPosition; void main() { vWorldPosition = position; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`,
-            fragmentShader: `uniform vec3 topColor; uniform vec3 midColor; uniform vec3 bottomColor; varying vec3 vWorldPosition; void main() { float h = normalize(vWorldPosition).y; vec3 finalColor = h > 0.0 ? mix(midColor, topColor, pow(h, 0.35)) : mix(midColor, bottomColor, pow(abs(h), 1.0)); gl_FragColor = vec4(finalColor, 1.0); }`
+            vertexShader: `
+                varying vec3 vWorldPosition;
+                void main() {
+                    vWorldPosition = position;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform vec3 topColor;
+                uniform vec3 midColor;
+                uniform vec3 bottomColor;
+                uniform vec3 sunDir;
+                uniform vec3 sunGlow;
+                uniform float uSunPower;
+                varying vec3 vWorldPosition;
+                void main() {
+                    vec3 dir = normalize(vWorldPosition);
+                    float h = dir.y;
+                    // Vertical gradient. pow(h, 0.35) leaves a generous
+                    // band of pale mid color along the horizon (atmospheric
+                    // haze) before easing into the saturated zenith blue.
+                    vec3 col = h > 0.0
+                        ? mix(midColor, topColor, pow(clamp(h, 0.0, 1.0), 0.35))
+                        : mix(midColor, bottomColor, pow(abs(h), 1.0));
+                    // Sun haze: wide bright halo around sun direction.
+                    // pow(.,2.0) gives a generous diffuse brightening
+                    // (atmospheric haze around the sun) rather than a
+                    // tight pinprick. uSunPower scales overall intensity.
+                    //
+                    // Halo color shifts from white at high sun → warm
+                    // gold as the sun drops toward the horizon, so
+                    // sunset reads as golden haze instead of a glaring
+                    // white ring. sunDir.y is the sun's elevation.
+                    float sunDot = max(0.0, dot(dir, sunDir));
+                    float halo = pow(sunDot, 2.0) * uSunPower;
+                    float sunHeight = clamp(sunDir.y, 0.0, 1.0);
+                    vec3 warmHalo = vec3(1.00, 0.72, 0.42);
+                    vec3 haloColor = mix(warmHalo, sunGlow, smoothstep(0.05, 0.30, sunHeight));
+                    col = mix(col, haloColor, halo);
+                    gl_FragColor = vec4(col, 1.0);
+                }
+            `
         });
         const skyMesh = new THREE.Mesh(skyGeo, skyMat);
+        skyMesh.renderOrder = -100;
         scene.add(skyMesh);
-        scene.fog = new THREE.FogExp2(0xffb59d, 0.00007);
+        scene.fog = new THREE.FogExp2(0xffb59d, 0.00006);
 
         const starGeo = new THREE.BufferGeometry();
         const starPositions = new Float32Array(5000 * 3);
@@ -1776,6 +1892,226 @@ if (isMobileDevice) {
         });
         const hazeMesh = new THREE.Mesh(hazeGeo, hazeMat);
         scene.add(hazeMesh);
+
+        // Volumetric clouds — raymarched fbm density slab between
+        // CLD_BASE and CLD_BASE+CLD_THICK, drawn on a camera-centered
+        // sphere that sits inside the sky dome (sky=60000, clouds=30000).
+        // depthWrite:false so terrain/objects draw cleanly on top;
+        // renderOrder=-90 means: sky(-100) → clouds(-90) → scene(0).
+        // Sun direction shares SUN_DIR by reference, so day/night just
+        // works. Cloud colors (uSunlit/uShadow/uSunTint) are mutated in
+        // updateTimeOfDay alongside the rest of the palette.
+        const CLOUD_COL_SUNLIT  = new THREE.Color(1.0, 1.0, 1.0);
+        const CLOUD_COL_SHADOW  = new THREE.Color(0.45, 0.50, 0.62);
+        const CLOUD_COL_SUNTINT = new THREE.Color(1.0, 0.85, 0.55);
+        const cloudGeo = new THREE.SphereGeometry(30000, 32, 24);
+        const cloudMat = new THREE.ShaderMaterial({
+            side: THREE.BackSide,
+            // transparent:false puts the cloud in the OPAQUE render
+            // queue, rendered between sky (-100) and terrain (0) by
+            // renderOrder. Terrain draws AFTER the cloud and writes
+            // its own depth, naturally painting over cloud pixels —
+            // no depth test required. Was previously transparent:true
+            // which put the cloud in the transparent queue rendered
+            // AFTER opaque terrain; depth-test against terrain's far
+            // distances was unreliable (precision issues with the
+            // 30k-radius sphere at near=0.1, far=200000), causing
+            // clouds to incorrectly draw in front of distant terrain.
+            transparent: false,
+            depthWrite: false,
+            depthTest: false,
+            // CustomBlending with src=ONE, dst=ONE_MINUS_SRC_ALPHA is
+            // the standard premultiplied-alpha blend equation. We need
+            // it explicitly because transparent:false would otherwise
+            // disable blending entirely. The shader outputs radiance
+            // already attenuated by transmittance (`col += T * (1-dT)
+            // * lit`) — i.e. RGB is premultiplied — so we use ONE for
+            // the source factor instead of SRC_ALPHA.
+            blending: THREE.CustomBlending,
+            blendSrc: THREE.OneFactor,
+            blendDst: THREE.OneMinusSrcAlphaFactor,
+            blendEquation: THREE.AddEquation,
+            uniforms: {
+                sunDir:    { value: SUN_DIR },           // shared ref, mutated by updateTimeOfDay
+                uTime:     { value: 0 },
+                uCamPos:   { value: new THREE.Vector3() }, // world-space anchor for noise sampling
+                uSunlit:   { value: CLOUD_COL_SUNLIT },  // top of cloud, lit
+                uShadow:   { value: CLOUD_COL_SHADOW },  // bottom, ambient
+                uSunTint:  { value: CLOUD_COL_SUNTINT }, // warm tint when looking near sun
+                uCoverage: { value: 0.58 },              // 0=fully overcast, 1=clear sky
+                uDensity:  { value: 1.4 }                // opacity multiplier
+            },
+            vertexShader: `
+                varying vec3 vWorldDir;
+                void main() {
+                    // Mesh is camera-positioned each frame, so the un-
+                    // transformed vertex position == direction from
+                    // the camera in world space.
+                    vWorldDir = position;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                precision highp float;
+
+                uniform vec3  sunDir;
+                uniform float uTime;
+                uniform vec3  uCamPos;
+                uniform vec3  uSunlit;
+                uniform vec3  uShadow;
+                uniform vec3  uSunTint;
+                uniform float uCoverage;
+                uniform float uDensity;
+
+                varying vec3 vWorldDir;
+
+                // Cheap value-noise + 4-octave fbm. Simplex would be
+                // ~2x more ops per sample for marginal visual gain at
+                // the resolution we're rendering (1/2.5 native).
+                float hash(vec3 p) {
+                    p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
+                    p *= 17.0;
+                    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+                }
+                float vnoise(vec3 p) {
+                    vec3 i = floor(p), f = fract(p);
+                    f = f * f * (3.0 - 2.0 * f);
+                    return mix(
+                        mix(mix(hash(i + vec3(0.0,0.0,0.0)), hash(i + vec3(1.0,0.0,0.0)), f.x),
+                            mix(hash(i + vec3(0.0,1.0,0.0)), hash(i + vec3(1.0,1.0,0.0)), f.x), f.y),
+                        mix(mix(hash(i + vec3(0.0,0.0,1.0)), hash(i + vec3(1.0,0.0,1.0)), f.x),
+                            mix(hash(i + vec3(0.0,1.0,1.0)), hash(i + vec3(1.0,1.0,1.0)), f.x), f.y),
+                        f.z);
+                }
+                float fbm(vec3 p) {
+                    float a = 0.5, t = 0.0;
+                    for (int i = 0; i < 4; i++) {
+                        t += a * vnoise(p);
+                        p *= 2.13;
+                        a *= 0.5;
+                    }
+                    return t;
+                }
+
+                // World-unit altitudes. CLD_BASE is well above the
+                // tallest reachable monolith (~3000) but below the
+                // sky dome (60000), so the slab projection is stable.
+                #define CLD_BASE  4800.0
+                #define CLD_THICK 2400.0
+                #define CLD_STEPS 28
+
+                void main() {
+                    vec3 dir = normalize(vWorldDir);
+                    // Render below the horizon too. With the opaque-
+                    // pipeline render setup, terrain (renderOrder 0)
+                    // draws AFTER the cloud (-90) and writes its own
+                    // pixels — so below-horizon cloud pixels are
+                    // naturally hidden by the ground/trees, and the
+                    // horizon cutoff line that's visible above-horizon
+                    // moves into the terrain-occluded zone.
+                    if (dir.y < -0.10) discard;
+
+                    // Curved-horizon parameterization (uses dir.y², so
+                    // sign of dir.y doesn't matter — same step length
+                    // for symmetric above/below rays). Replaces flat
+                    // 1/dir.y (which blows up at the horizon) with
+                    // 1/sqrt(dir.y² + 0.10), placing the slab on a
+                    // small concave "earth" of radius ~30k. tBase
+                    // asymptotes to ~15k near the horizon, so the
+                    // distance fade no longer crushes low-elevation
+                    // clouds to zero — they stay visible right down
+                    // to the horizon and below.
+                    float invY = 1.0 / sqrt(dir.y * dir.y + 0.10);
+                    float tBase = CLD_BASE * invY;
+                    float tTop  = (CLD_BASE + CLD_THICK) * invY;
+                    float marchLen = tTop - tBase;
+                    float dt = marchLen / float(CLD_STEPS);
+
+                    // Wind drift in world units per second. Noise scale
+                    // 0.00065 → feature size ~1500 units, so 45 u/s
+                    // gives ~33 s per feature traversal — clearly
+                    // visible drift.
+                    vec3 wind = vec3(uTime * 45.0, 0.0, uTime * 15.0);
+
+                    float T = 1.0;            // transmittance
+                    vec3  col = vec3(0.0);
+                    float sunDot = max(0.0, dot(dir, sunDir));
+                    float sunGlow = pow(sunDot, 4.0);
+
+                    for (int i = 0; i < CLD_STEPS; i++) {
+                        float t = tBase + dt * (float(i) + 0.5);
+                        // Use dir directly. For below-horizon rays this
+                        // samples a downward-tilted slice of the 3D fbm
+                        // field — different noise from the above-horizon
+                        // slice, so no reflection. Below-horizon pixels
+                        // are mostly hidden by terrain anyway since
+                        // terrain renders after cloud in the opaque
+                        // pipeline. uCamPos anchors the noise field in
+                        // world space so clouds don't track the camera.
+                        vec3 p = t * dir + uCamPos + wind;
+                        float d = fbm(p * 0.00065);
+                        // Coverage shapes density: smoothstep gives a
+                        // soft cutoff so cloud edges are wispy rather
+                        // than abrupt.
+                        d = smoothstep(uCoverage, uCoverage + 0.18, d);
+
+                        // Distance attenuation. Tames per-sample optical
+                        // depth so grazing rays don't form a wall.
+                        d *= exp(-t * 9e-5);
+                        // Angular attenuation. The curved-horizon math
+                        // caps t at ~15k near the horizon, which means
+                        // the distance fade above stops differentiating
+                        // far clouds from closer ones — every cloud
+                        // ends up the same density. This explicit
+                        // dir.y-based fade restores the "distant clouds
+                        // dissolve into haze" feel: heavily thinned
+                        // near horizon (~10% density), full overhead.
+                        // Combined with the per-sample distance fade,
+                        // gives ~9× contrast between zenith and horizon.
+                        d *= smoothstep(-0.05, 0.55, dir.y);
+
+                        if (d > 0.001) {
+                            // Vertical lighting cheat: top of cloud
+                            // gets sunlit color, bottom gets ambient
+                            // shadow color. Real self-shadowing via a
+                            // secondary march toward the sun would be
+                            // ~4x cost — this approximation reads fine.
+                            float h = (t - tBase) / marchLen;
+                            vec3 lit = mix(uShadow, uSunlit, h);
+                            // Forward-scattering: warm halo when
+                            // looking toward the sun (silver lining).
+                            lit = mix(lit, uSunTint, sunGlow * 0.55);
+
+                            // Beer-Lambert. The 0.001 scales dt (in
+                            // world units) into a reasonable optical-
+                            // depth range; tune via uDensity uniform.
+                            float dT = exp(-uDensity * d * dt * 0.001);
+                            col += T * (1.0 - dT) * lit;
+                            T *= dT;
+                            if (T < 0.01) break;
+                        }
+                    }
+
+                    // Fade band straddles the horizon (-0.10 → 0.18).
+                    // At dir.y = 0 (horizon line itself), alpha is
+                    // about 0.31 — clouds visibly continue past the
+                    // horizon. Below horizon, alpha ramps to zero at
+                    // -0.10 where the discard kicks in. Those below-
+                    // horizon cloud pixels are naturally hidden by
+                    // terrain since terrain renders AFTER the cloud
+                    // in the opaque pipeline. Net: no visible cutoff
+                    // line because the cutoff is in the terrain-
+                    // occluded zone.
+                    float horizonFade = smoothstep(-0.10, 0.18, dir.y);
+                    float alpha = (1.0 - T) * horizonFade;
+                    gl_FragColor = vec4(col, alpha);
+                }
+            `
+        });
+        const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+        cloudMesh.renderOrder = -90;
+        cloudMesh.frustumCulled = false;
+        scene.add(cloudMesh);
 
         let sX = 0, sZ = 0, maxH = -Infinity;
         for (let x = 2500; x <= 4500; x += 50) {
@@ -5364,7 +5700,6 @@ const s = Math.sin(angle); const c = Math.cos(angle);
 
                 // Assemble one InstancedMesh per sub-mesh template.
                 const _mDummy = new THREE.Object3D();
-                let _mCalls = 0;
                 sub.forEach(s => {
                     if (!s.instances.length) return;
                     const im = new THREE.InstancedMesh(s.geometry, s.material, s.instances.length);
@@ -5380,9 +5715,7 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                     }
                     im.instanceMatrix.needsUpdate = true;
                     scene.add(im);
-                    _mCalls++;
                 });
-                console.log('Mushrooms spawned: ' + placed + ' instances across ' + _mCalls + ' draw calls');
             }, undefined, e => console.warn('Mushroom GLB not found:', e));
         })();
 
@@ -5618,310 +5951,6 @@ const s = Math.sin(angle); const c = Math.cos(angle);
             }, undefined, e => console.warn('70-rock pack not found:', e));
         })();
 
-        // ── CLOUDS (GLB) ──
-        // Loads assets/Clouds.glb — a low-poly pack with 3 cumulus shapes
-        // merged into one mesh. We split that one mesh into the 3 distinct
-        // shapes by spatial-clustering its triangles (the GLB has unwelded
-        // verts so we can't use connected components — every face would
-        // be its own "cloud"). Then instance each cloud type across the
-        // sky at high altitude. MeshStandardMaterial means clouds inherit
-        // the existing sun + hemisphere lighting automatically — they
-        // tint warm at sunset and cool blue at night without any extra
-        // shader work, just like trees and rocks do.
-        (function spawnClouds() {
-            const loader = new GLTFLoader();
-            loader.load('assets/Clouds.glb', gltf => {
-                // Find the (single) mesh and pull out its geometry.
-                let srcMesh = null;
-                gltf.scene.traverse(n => { if (n.isMesh && !srcMesh) srcMesh = n; });
-                if (!srcMesh) { console.warn('No mesh in Clouds.glb'); return; }
-
-                const srcGeo = srcMesh.geometry;
-                const posAttr = srcGeo.attributes.position;
-                const idxAttr = srcGeo.index;
-                if (!idxAttr) { console.warn('Clouds.glb mesh has no index buffer'); return; }
-                const positions = posAttr.array;
-                const indices = idxAttr.array;
-                const triCount = indices.length / 3;
-
-                // Compute triangle centroids for spatial clustering.
-                const centroids = new Float32Array(triCount * 3);
-                for (let t = 0; t < triCount; t++) {
-                    const a = indices[t*3]   * 3;
-                    const b = indices[t*3+1] * 3;
-                    const c = indices[t*3+2] * 3;
-                    centroids[t*3]   = (positions[a]   + positions[b]   + positions[c])   / 3;
-                    centroids[t*3+1] = (positions[a+1] + positions[b+1] + positions[c+1]) / 3;
-                    centroids[t*3+2] = (positions[a+2] + positions[b+2] + positions[c+2]) / 3;
-                }
-
-                // Spatial-hash union-find: tris within R of each other join
-                // the same cluster. R=0.04 (model-local units) is bigger
-                // than typical face size (~0.03) but smaller than gaps
-                // between separate cloud bodies (>0.05).
-                const R = 0.04, R2 = R * R, CELL = R;
-                const parent = new Int32Array(triCount);
-                for (let i = 0; i < triCount; i++) parent[i] = i;
-                const find = x => {
-                    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
-                    return x;
-                };
-                const union = (a, b) => {
-                    const ra = find(a), rb = find(b);
-                    if (ra !== rb) parent[ra] = rb;
-                };
-                const grid = new Map();
-                const cellKey = (cx, cy, cz) => cx + ',' + cy + ',' + cz;
-                for (let t = 0; t < triCount; t++) {
-                    const cx = Math.floor(centroids[t*3]   / CELL);
-                    const cy = Math.floor(centroids[t*3+1] / CELL);
-                    const cz = Math.floor(centroids[t*3+2] / CELL);
-                    const k = cellKey(cx, cy, cz);
-                    let bucket = grid.get(k);
-                    if (!bucket) { bucket = []; grid.set(k, bucket); }
-                    bucket.push(t);
-                }
-                for (let t = 0; t < triCount; t++) {
-                    const px = centroids[t*3], py = centroids[t*3+1], pz = centroids[t*3+2];
-                    const cx = Math.floor(px / CELL);
-                    const cy = Math.floor(py / CELL);
-                    const cz = Math.floor(pz / CELL);
-                    for (let dx = -1; dx <= 1; dx++)
-                    for (let dy = -1; dy <= 1; dy++)
-                    for (let dz = -1; dz <= 1; dz++) {
-                        const bucket = grid.get(cellKey(cx+dx, cy+dy, cz+dz));
-                        if (!bucket) continue;
-                        for (let i = 0; i < bucket.length; i++) {
-                            const u = bucket[i];
-                            if (u === t) continue;
-                            const ddx = centroids[u*3]   - px;
-                            const ddy = centroids[u*3+1] - py;
-                            const ddz = centroids[u*3+2] - pz;
-                            if (ddx*ddx + ddy*ddy + ddz*ddz < R2) union(t, u);
-                        }
-                    }
-                }
-
-                // Group triangles by root, then build a separate geometry
-                // per cluster. We re-pack vertices so each template is
-                // self-contained (its own POSITION + NORMAL buffers).
-                const clusters = new Map();
-                for (let t = 0; t < triCount; t++) {
-                    const r = find(t);
-                    let arr = clusters.get(r);
-                    if (!arr) { arr = []; clusters.set(r, arr); }
-                    arr.push(t);
-                }
-                // Sort by tri count descending and keep all clusters with
-                // >100 tris (filters out any stray noise; expected ≈3 clouds).
-                const clusterList = [...clusters.values()]
-                    .filter(arr => arr.length > 100)
-                    .sort((a, b) => b.length - a.length);
-                console.log('Cloud shapes extracted:', clusterList.length);
-                if (clusterList.length === 0) return;
-
-                const normalAttr = srcGeo.attributes.normal;
-                const normals = normalAttr ? normalAttr.array : null;
-
-                const templates = clusterList.map(triList => {
-                    // Re-pack: gather unique source verts used by these
-                    // tris, build a remap, then emit fresh geometry. Also
-                    // recenter X/Z and lift base to y=0 so placement is
-                    // just `(x, altitude, z)` with no per-template offset.
-                    const usedVerts = new Map();   // srcIdx → newIdx
-                    const newPositions = [];
-                    const newNormals = [];
-                    const newIndices = [];
-                    for (const t of triList) {
-                        for (let k = 0; k < 3; k++) {
-                            const srcIdx = indices[t*3 + k];
-                            let newIdx = usedVerts.get(srcIdx);
-                            if (newIdx === undefined) {
-                                newIdx = newPositions.length / 3;
-                                usedVerts.set(srcIdx, newIdx);
-                                newPositions.push(
-                                    positions[srcIdx*3],
-                                    positions[srcIdx*3+1],
-                                    positions[srcIdx*3+2]
-                                );
-                                if (normals) newNormals.push(
-                                    normals[srcIdx*3],
-                                    normals[srcIdx*3+1],
-                                    normals[srcIdx*3+2]
-                                );
-                            }
-                            newIndices.push(newIdx);
-                        }
-                    }
-                    const geo = new THREE.BufferGeometry();
-                    geo.setAttribute('position', new THREE.Float32BufferAttribute(newPositions, 3));
-                    if (newNormals.length) geo.setAttribute('normal', new THREE.Float32BufferAttribute(newNormals, 3));
-                    else geo.computeVertexNormals();
-                    geo.setIndex(newIndices);
-                    geo.computeBoundingBox();
-                    const bb = geo.boundingBox;
-                    geo.translate(
-                        -(bb.min.x + bb.max.x) * 0.5,
-                        -bb.min.y,
-                        -(bb.min.z + bb.max.z) * 0.5
-                    );
-                    geo.computeBoundingBox();
-                    const h = geo.boundingBox.max.y;
-                    return { geometry: geo, height: h };
-                });
-
-                // Single shared material: bright white, full roughness so
-                // it stays matte (no specular highlights), no metalness.
-                // The scene's existing sunLight + hemiLight do all the
-                // tinting work — warm at sunset, blue at night, white
-                // at noon, completely automatic.
-                //
-                // Semi-transparent (opacity 0.85) so you can faintly see
-                // the sky/sun through clouds — reads as wispy vapor rather
-                // than solid styrofoam. depthWrite OFF prevents overlapping
-                // clouds from punching depth-buffer holes in each other,
-                // which would produce visible seams when one drifts behind
-                // another. depthTest stays ON so terrain/sun/moon still
-                // occlude clouds correctly.
-                const cloudMat = new THREE.MeshStandardMaterial({
-                    color: 0xffffff,
-                    roughness: 1.0,
-                    metalness: 0.0,
-                    flatShading: false,
-                    transparent: true,
-                    opacity: 0.85,
-                    depthWrite: false,
-                });
-
-                // Spawn instances. Clouds aren't static — they drift on
-                // wind across the world AND have a fade-in / live / fade-out
-                // life cycle, then respawn at a random location. This reads
-                // like real cumulus condensing, drifting, and dissipating.
-                //
-                // Each cloud stores its own state in userData so the per-
-                // frame tick function (registered as window.cloudsTick and
-                // called from the main animate loop) can update them.
-                const CLOUD_COUNT = 30;
-                const ALT_MIN = 8500;
-                const ALT_MAX = 12000;
-                const SCALE_MIN = 1500;   // each unit of model height → world units
-                const SCALE_MAX = 3500;
-                const SPREAD = 90000;
-
-                // Wind direction (unit XZ) and speed in world units / sec.
-                // At 110 u/s a cloud crosses the 90k spread in ~14 minutes —
-                // noticeably moving while you watch the sky.
-                const WIND_DIR_X = 0.85;
-                const WIND_DIR_Z = 0.53;
-                const WIND_SPEED = 110;
-
-                // Lifecycle: each cloud lives ~LIFE_SECONDS, with FADE_FRAC
-                // of that spent ramping in (start) and out (end). Start
-                // each cloud at a random point in its life so they don't
-                // all bloom and die in sync. With LIFE=240s and FADE=0.30,
-                // the bloom and dissipation phases each take ~72 seconds —
-                // slow enough that you can watch a cloud actually form.
-                const LIFE_SECONDS = 240;
-                const FADE_FRAC    = 0.30;   // 30% in, 40% full, 30% out
-
-                const clouds = [];
-                let placed = 0;
-                for (let i = 0; i < CLOUD_COUNT; i++) {
-                    const tpl = templates[Math.floor(rnd() * templates.length)];
-                    const cloud = new THREE.Mesh(tpl.geometry, cloudMat);
-                    const targetH = SCALE_MIN + rnd() * (SCALE_MAX - SCALE_MIN);
-                    const fullScale = targetH / tpl.height;
-                    cloud.position.set(
-                        (rnd() - 0.5) * SPREAD,
-                        ALT_MIN + rnd() * (ALT_MAX - ALT_MIN),
-                        (rnd() - 0.5) * SPREAD
-                    );
-                    cloud.rotation.y = rnd() * Math.PI * 2;
-                    cloud.scale.setScalar(0.001);   // start invisible; tick will scale up
-                    cloud.castShadow = false;
-                    cloud.receiveShadow = false;
-                    cloud.frustumCulled = true;
-                    // Per-cloud state for the tick function. fullScale is
-                    // the peak size; lifeAge starts random so clouds are
-                    // staggered through their lifecycles at world load.
-                    cloud.userData = {
-                        fullScale: fullScale,
-                        // Slight horizontal stretch baked into the scale
-                        // multipliers so the tick can just write
-                        // scale.x = baseScale * stretchX, etc.
-                        stretchX: 1.3,
-                        stretchY: 1.0,
-                        stretchZ: 1.3,
-                        lifeAge: rnd() * LIFE_SECONDS,
-                    };
-                    scene.add(cloud);
-                    clouds.push(cloud);
-                    placed++;
-                }
-                console.log('Clouds spawned:', placed);
-
-                // Half-extents of the wrap volume. When a cloud drifts
-                // past +HALF on either axis, snap it to -HALF so it
-                // re-enters from the opposite edge — looks like an
-                // endless sky.
-                const HALF = SPREAD * 0.5;
-
-                // Smoothstep helper for soft fade in/out instead of linear.
-                // Cubic eases at both ends so clouds bloom and dissipate
-                // gently rather than popping.
-                const smoothstep = (e0, e1, x) => {
-                    const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
-                    return t * t * (3 - 2 * t);
-                };
-
-                // Per-frame update function. Called once per frame from
-                // the main animate loop. Drifts each cloud with wind and
-                // updates its lifecycle scale. Cheap — ~30 clouds × a
-                // handful of math ops per frame, no allocations.
-                window.cloudsTick = function(delta) {
-                    const wx = WIND_DIR_X * WIND_SPEED * delta;
-                    const wz = WIND_DIR_Z * WIND_SPEED * delta;
-                    for (let i = 0; i < clouds.length; i++) {
-                        const c = clouds[i];
-                        const ud = c.userData;
-
-                        // Wind drift + wrap. If the cloud crosses an edge,
-                        // snap it to the opposite side AND randomize the
-                        // perpendicular axis a bit so wrapping doesn't
-                        // produce visible rails of clouds.
-                        c.position.x += wx;
-                        c.position.z += wz;
-                        if (c.position.x >  HALF) { c.position.x = -HALF; c.position.z = (rnd()-0.5) * SPREAD; }
-                        if (c.position.x < -HALF) { c.position.x =  HALF; c.position.z = (rnd()-0.5) * SPREAD; }
-                        if (c.position.z >  HALF) { c.position.z = -HALF; c.position.x = (rnd()-0.5) * SPREAD; }
-                        if (c.position.z < -HALF) { c.position.z =  HALF; c.position.x = (rnd()-0.5) * SPREAD; }
-
-                        // Lifecycle. Age normalized to 0-1 over LIFE_SECONDS.
-                        // Fade ramps: 0 → 1 over first FADE_FRAC, hold at 1,
-                        // 1 → 0 over last FADE_FRAC. When age completes, the
-                        // cloud "dies" and respawns at a random spot with a
-                        // new height/rotation so the sky composition keeps
-                        // changing instead of repeating.
-                        ud.lifeAge += delta;
-                        if (ud.lifeAge >= LIFE_SECONDS) {
-                            ud.lifeAge = 0;
-                            c.position.set(
-                                (rnd() - 0.5) * SPREAD,
-                                ALT_MIN + rnd() * (ALT_MAX - ALT_MIN),
-                                (rnd() - 0.5) * SPREAD
-                            );
-                            c.rotation.y = rnd() * Math.PI * 2;
-                        }
-                        const t = ud.lifeAge / LIFE_SECONDS;
-                        const fadeIn  = smoothstep(0,            FADE_FRAC,     t);
-                        const fadeOut = smoothstep(1 - FADE_FRAC, 1.0,           t);
-                        const life = fadeIn * (1 - fadeOut);
-                        const s = ud.fullScale * life;
-                        c.scale.set(s * ud.stretchX, s * ud.stretchY, s * ud.stretchZ);
-                    }
-                };
-            }, undefined, e => console.warn('Clouds GLB not found:', e));
-        })();
 
 
 // --- 5 DISTANT CRYSTAL MONOLITHS WITH FULL PARKOUR ---
@@ -7916,16 +7945,22 @@ const s = Math.sin(angle); const c = Math.cos(angle);
             moonOp:     0.35
         };
         const TOD_DAY = {
-            skyTop:     new THREE.Color(0x9ebcd6),
-            skyMid:     new THREE.Color(0xc2d6e3),
-            skyBottom:  new THREE.Color(0xdde8ee),
+            // Lightly saturated zenith blue fading to a pale hazy horizon.
+            // Closer to the original pale palette but with enough zenith
+            // saturation to read as "blue sky" rather than washed-out grey.
+            skyTop:     new THREE.Color(0x6896c8),
+            skyMid:     new THREE.Color(0xc0d2dd),
+            skyBottom:  new THREE.Color(0xd5e2ec),
             sunCol:     new THREE.Color(0xfff2d4),
             sunInt:     3.4,
             hemiSky:    new THREE.Color(0xb8d2e2),
             hemiGround: new THREE.Color(0xa89578),
             hemiInt:    1.25,
             fogCol:     new THREE.Color(0xd0dbe4),
-            hazeCol:    new THREE.Color(0xffceaa),
+            // Day haze killed — Preetham produces its own sun glow, the
+            // additive peach was double-painting the horizon white.
+            // TOD_GOLDEN.hazeCol still drives the warm sunset/sunrise band.
+            hazeCol:    new THREE.Color(0x000000),
             sunGlow:    new THREE.Color(0xffd8a8),
             sunCore:    new THREE.Color(0xffffff),
             starOp:     0.0,
@@ -7994,8 +8029,51 @@ const s = Math.sin(angle); const c = Math.cos(angle);
             skyMat.uniforms.topColor.value.copy(_palOut.skyTop);
             skyMat.uniforms.midColor.value.copy(_palOut.skyMid);
             skyMat.uniforms.bottomColor.value.copy(_palOut.skyBottom);
+            // Sun haze halo intensity. sunGlow color is hardcoded white
+            // at init (independent of palette). sunDir references SUN_DIR
+            // by reference, so the mutation in this function propagates.
+            //
+            // Stronger near the horizon sun for golden-hour brightening,
+            // but gated by `horizonGate` so the halo fades out as the
+            // sun drops below the horizon — otherwise the dot-product
+            // halo lingers into evening/night since sky directions near
+            // the just-set sun still produce high cosTheta.
+            const sunsetBoost = 1.0 - smoothstepTOD(0.05, 0.45, Math.abs(elev));
+            const horizonGate = smoothstepTOD(-0.05, 0.10, elev);
+            skyMat.uniforms.uSunPower.value = horizonGate * (0.55 + sunsetBoost * 0.20);
             scene.fog.color.copy(_palOut.fogCol);
             hazeMat.uniforms.glowColor.value.copy(_palOut.hazeCol);
+
+            // Volumetric cloud lighting. Three colors track the same
+            // elev curve as everything else, so clouds tint warm at
+            // sunset and dim deep blue at night without a separate
+            // palette table. uSunlit is the bright top of the cloud,
+            // uShadow the ambient underside, uSunTint the warm halo
+            // applied when looking toward the sun.
+            const cloudDay = smoothstepTOD(-0.05, 0.30, elev);
+            const cloudSunset = 1.0 - smoothstepTOD(0.08, 0.40, Math.max(0, elev));
+            // Top: deep blue at night → bright white at noon. Push
+            // slightly past 1.0 at noon for ACES tone-map headroom.
+            cloudMat.uniforms.uSunlit.value.setRGB(
+                0.06 + cloudDay * 1.04,
+                0.08 + cloudDay * 1.02,
+                0.12 + cloudDay * 0.92
+            );
+            // Bottom: very dark blue at night → soft warm-white at noon.
+            // Kept fairly bright so cloud bodies don't read as grey
+            // overcast — most rays sample mostly the lower half of the
+            // slab so the shadow color dominates the average pixel.
+            cloudMat.uniforms.uShadow.value.setRGB(
+                0.03 + cloudDay * 0.85,
+                0.04 + cloudDay * 0.85,
+                0.07 + cloudDay * 0.88
+            );
+            // Sun tint: gold at sunset, neutral warm-white midday.
+            cloudMat.uniforms.uSunTint.value.setRGB(
+                1.0 + cloudSunset * 0.6,
+                0.85 - cloudSunset * 0.05,
+                0.55 - cloudSunset * 0.20
+            );
             // hazeMat.uniforms.sunDir already references SUN_DIR, so the
             // mutation above propagates automatically.
 
@@ -8011,9 +8089,6 @@ const s = Math.sin(angle); const c = Math.cos(angle);
             sunMat.uniforms.coreColor.value.copy(_palOut.sunCore);
             starMaterial.opacity = _palOut.starOp;
             moon.material.opacity = _palOut.moonOp;
-            // Halo rides on top of the moon's opacity curve, but a bit
-            // steeper — it should almost fully fade out even in dusk/dawn
-            // golden hour, then pop at full night.
             // Halo rides on top of the moon's opacity curve, but a bit
             // steeper — fully fades out at dusk/dawn, then *strongly*
             // pops at full night. The 1.6 multiplier gets clamped to 1.0
@@ -8034,12 +8109,13 @@ const s = Math.sin(angle); const c = Math.cos(angle);
             lanternLight.distance  = 6000 + nightness * 16000;   // up to ~22000 units at full night
             lanternCore.material.emissiveIntensity = 8 + nightness * 22;
 
-            // Sun disc shrinks when high in the sky (real atmospheres make
-            // the sun *look* bigger near the horizon for optical/illusion
-            // reasons — matching that feel reads as "overhead sun is
-            // smaller" without actually touching horizon sizing).
-            // elev = 0 → 1.00x scale, elev = 1 (noon) → 0.70x.
-            const sunScale = 1.0 - Math.max(0, elev) * 0.30;
+            // Sun disc shrinks fast as it leaves the horizon (real
+            // atmospheres make the sun *look* bigger near the horizon).
+            // Smoothstep over the first ~17° of elevation so by the time
+            // the sky has gone fully Preetham-blue the disc is already
+            // at its minimum size. elev=0 → 1.00x, elev≥0.30 → 0.20x.
+            const sunShrink = smoothstepTOD(0.0, 0.30, Math.max(0, elev));
+            const sunScale = 1.0 - sunShrink * 0.80;
             sunMesh.scale.set(sunScale, sunScale, 1);
         }
 
@@ -8337,6 +8413,15 @@ const s = Math.sin(angle); const c = Math.cos(angle);
 
             skyMesh.position.copy(camera.position);
             hazeMesh.position.copy(camera.position);
+            // Volumetric cloud dome rides with the camera so the
+            // raymarch is always in camera-relative space (the vertex
+            // shader treats local position as the eye direction).
+            // The noise field itself is anchored in world space via
+            // uCamPos — clouds stay put as the player walks, instead
+            // of locking to the camera.
+            cloudMesh.position.copy(camera.position);
+            cloudMat.uniforms.uTime.value = time;
+            cloudMat.uniforms.uCamPos.value.copy(camera.position);
 
             // Drift clouds with wind + age them through their fade
             // in/live/fade out lifecycle. The function is registered
@@ -8403,7 +8488,7 @@ const s = Math.sin(angle); const c = Math.cos(angle);
             }
         }
 
-      
+
         animate();
         window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth / PIXEL_SCALE, window.innerHeight / PIXEL_SCALE, false); });
 
