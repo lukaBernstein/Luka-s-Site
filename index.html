@@ -687,6 +687,22 @@
             opacity: .3;
             margin-top: 18px;
         }
+
+        #perf-overlay {
+            position: fixed;
+            top: 8px;
+            left: 8px;
+            z-index: 99999;
+            padding: 6px 9px;
+            background: rgba(0, 0, 0, 0.55);
+            color: #b6f5b6;
+            font: 12px/1.35 ui-monospace, Menlo, Consolas, monospace;
+            border-radius: 4px;
+            pointer-events: none;
+            white-space: pre;
+            display: none;
+        }
+        #perf-overlay.show { display: block; }
     </style>
 </head>
 <body>
@@ -696,6 +712,7 @@
 </audio>
 
     <div id="three-layer"></div>
+    <div id="perf-overlay"></div>
     
     <div id="ascii-layer">
         <canvas id="ascii-canvas"></canvas>
@@ -1820,7 +1837,7 @@ if (isMobileDevice) {
         const PIXEL_SCALE = 2.5; 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 200000);
-        const renderer = new THREE.WebGLRenderer({ antialias: false });
+        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
         renderer.setSize(window.innerWidth / PIXEL_SCALE, window.innerHeight / PIXEL_SCALE, false);
         
         renderer.shadowMap.enabled = true;
@@ -1829,6 +1846,39 @@ if (isMobileDevice) {
         renderer.toneMappingExposure = 1.15;
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         document.getElementById('three-layer').appendChild(renderer.domElement);
+
+        // ── PERF OVERLAY ──────────────────────────────────────────
+        // Toggle with F3. Shows FPS (rolling avg), frame ms (worst in
+        // the last sample window — spikes matter more than averages
+        // for "feels janky"), draw calls, and triangles. Updates the
+        // DOM at ~4Hz so it doesn't itself become a perf cost.
+        const Perf = (() => {
+            const el = document.getElementById('perf-overlay');
+            let frames = 0, accumMs = 0, worstMs = 0, lastFlush = performance.now();
+            let frameStart = 0, enabled = false;
+            return {
+                toggle() { enabled = !enabled; el.classList.toggle('show', enabled); },
+                begin() { if (enabled) frameStart = performance.now(); },
+                end() {
+                    if (!enabled) return;
+                    const now = performance.now();
+                    const dt = now - frameStart;
+                    frames++; accumMs += dt;
+                    if (dt > worstMs) worstMs = dt;
+                    if (now - lastFlush >= 250) {
+                        const fps = (frames * 1000 / (now - lastFlush)).toFixed(0);
+                        const avg = (accumMs / frames).toFixed(1);
+                        const info = renderer.info;
+                        el.textContent =
+                            `${fps} fps   avg ${avg} ms   worst ${worstMs.toFixed(1)} ms\n` +
+                            `draws ${info.render.calls}   tris ${info.render.triangles.toLocaleString()}\n` +
+                            `geoms ${info.memory.geometries}   tex ${info.memory.textures}`;
+                        frames = 0; accumMs = 0; worstMs = 0; lastFlush = now;
+                    }
+                }
+            };
+        })();
+        window.Perf = Perf;
 
         const SUN_DIR = new THREE.Vector3(0, 0.02, -1).normalize();
 
@@ -5279,9 +5329,15 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                             if (sc.x < 0.001 || sc.x > 0.999 ||
                                 sc.y < 0.001 || sc.y > 0.999 ||
                                 sc.z > 0.999) return 1.0;
-                            // Distance-fade so blades way past the frustum's
-                            // edge don't suddenly snap from shadowed to lit.
-                            float distFade = 1.0 - smoothstep(2200.0, 2900.0, vFogDepth);
+                            // Distance-fade: skip the 9-tap PCF on far blades.
+                            // Distant grass covers ~1px on screen, so the
+                            // PCF detail is invisible there but the per-
+                            // fragment cost is huge. Closing the window to
+                            // 600→1200 cuts shadow sampling on the vast
+                            // majority of fragments while keeping the full
+                            // kernel on close-up blades where you actually
+                            // see the soft edge.
+                            float distFade = 1.0 - smoothstep(600.0, 1200.0, vFogDepth);
                             if (distFade <= 0.0) return 1.0;
                             // Bias: 0.0025 in NDC depth ≈ 200 world units of
                             // tolerance with our 80k far plane. Grass blades
@@ -5487,9 +5543,11 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                 const meadow = new THREE.Mesh(geo, grassMat);
                 meadow.frustumCulled = false;
                 meadow.renderOrder   = 1;
+                meadow.name          = name;
                 scene.add(meadow);
 
                 fieldMaterials.push(grassMat);
+                (window.meadowMeshes = window.meadowMeshes || []).push(meadow);
 
                 // Hot-update uNumPaths when monoliths/paths arrive later.
                 WORLD_PATHS.registerConsumer(() => grassMat.uniforms);
@@ -5508,7 +5566,16 @@ const s = Math.sin(angle); const c = Math.cos(angle);
             //                      tall blades on a small rise can't poke
             //                      above the player's sightline.
             buildField({
-                FIELD: 280, CELL_SIZE: 35,
+                // FIELD 120 with CELL_SIZE 35 unchanged → same per-area
+                // density as before, but half-radius drops 4900u → 2100u
+                // and instance count drops 78.4k → 14.4k (-82%). Distant
+                // grass past the fadeOutEnd boundary is replaced by the
+                // ground shader's painted grass detail, which is invisible
+                // through the heavy fog at those distances anyway. Massive
+                // vertex-shader savings since per-frame cost scales with
+                // instance count regardless of how few pixels each blade
+                // ends up covering at PIXEL_SCALE 2.5.
+                FIELD: 120, CELL_SIZE: 35,
                 tuftW: 75, tuftH: 90,
                 hMin: 1.05, hMax: 1.15,
                 bladeTex: innerBladeTex,
@@ -5738,7 +5805,13 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                 sub.forEach(s => {
                     if (!s.instances.length) return;
                     const im = new THREE.InstancedMesh(s.geometry, s.material, s.instances.length);
-                    im.castShadow = true;
+                    // Mushrooms don't cast shadows: each one is small enough
+                    // that its shadow lands inside its own footprint at
+                    // typical sun angles, so the cast is invisible — but
+                    // every patch still re-renders into the shadow map every
+                    // frame. Receiving shadows from trees etc. still matters,
+                    // so leave receiveShadow on.
+                    im.castShadow = false;
                     im.receiveShadow = true;
                     for (let i = 0; i < s.instances.length; i++) {
                         const inst = s.instances[i];
@@ -6985,12 +7058,9 @@ const s = Math.sin(angle); const c = Math.cos(angle);
         const sunMesh = new THREE.Mesh(new THREE.PlaneGeometry(35000, 35000), sunMat);
         scene.add(sunMesh);
         const sunLight = new THREE.DirectionalLight(0xffccaa, 2.5); sunLight.castShadow = true;
-        // 2048 is plenty for a 6000-unit shadow camera frustum (~3u/texel)
-        // — combined with PCFSoftShadowMap and the 3×3 PCF in the grass
-        // shader, the soft edges hide any aliasing. 4096 was 4× the data
-        // re-rendered every frame as the day/night sun rotates; 2048 cuts
-        // shadow render time and per-fragment shadow sample cost without a
-        // visible difference at the chosen pixel scale.
+        // 2048 texels over a 6000-unit shadow frustum = ~2.93u/texel.
+        // Combined with PCFSoftShadowMap and the 3×3 PCF in the grass
+        // shader, the soft edges hide any aliasing.
         sunLight.shadow.mapSize.set(2048, 2048); sunLight.shadow.camera.left = -3000; sunLight.shadow.camera.right = 3000;
         sunLight.shadow.camera.top = 3000; sunLight.shadow.camera.bottom = -3000;
         sunLight.shadow.camera.near = 100; sunLight.shadow.camera.far = 80000;
@@ -6998,6 +7068,7 @@ const s = Math.sin(angle); const c = Math.cos(angle);
         sunLight.shadow.radius = 2.0;
         const hemiLight = new THREE.HemisphereLight(0x99aacc, 0xffb59d, 1.2);
         scene.add(sunLight, sunLight.target, hemiLight);
+
 
         function createMoonTexture() {
             const size = 256;
@@ -7486,6 +7557,75 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                 }
                 console.log('Grass shadow debug:', window.shadowDebugOn ? 'ON' : 'OFF');
             }
+            // ── PERF A/B TOGGLES (1–4) ────────────────────────────
+            // Quickly disable heavy systems to see which one is
+            // costing us GPU time. Watch the FPS in the perf overlay
+            // (`) before and after each toggle.
+            if (key === '1') {
+                sunLight.castShadow = !sunLight.castShadow;
+                renderer.shadowMap.enabled = sunLight.castShadow;
+                renderer.shadowMap.needsUpdate = true;
+                // Force materials to recompile so they pick up the
+                // shadow-map state change cleanly.
+                scene.traverse(o => { if (o.isMesh && o.material) o.material.needsUpdate = true; });
+                console.log('[perf] Sun shadows:', sunLight.castShadow ? 'ON' : 'OFF');
+            }
+            if (key === '2') {
+                cloudMesh.visible = !cloudMesh.visible;
+                console.log('[perf] Volumetric clouds:', cloudMesh.visible ? 'ON' : 'OFF');
+            }
+            if (key === '3') {
+                // Cache the grass meshes on first toggle so we don't
+                // walk the whole scene every press.
+                if (!window._grassMeshCache) {
+                    window._grassMeshCache = [];
+                    if (window.fieldMaterials) {
+                        const matSet = new Set(window.fieldMaterials);
+                        scene.traverse(o => {
+                            if (o.isMesh && matSet.has(o.material)) {
+                                window._grassMeshCache.push(o);
+                            }
+                        });
+                    }
+                }
+                window._grassHidden = !window._grassHidden;
+                for (const m of window._grassMeshCache) m.visible = !window._grassHidden;
+                console.log('[perf] Grass meadow:', window._grassHidden ? 'OFF' : 'ON',
+                            `(${window._grassMeshCache.length} meshes)`);
+            }
+            if (key === '4') {
+                if (scene.fog) {
+                    window._savedFog = scene.fog;
+                    scene.fog = null;
+                } else {
+                    scene.fog = window._savedFog || new THREE.FogExp2(0xffb59d, 0.00006);
+                }
+                // Standard materials need a recompile to drop/add the
+                // fog branch. Custom shaders (grass, clouds) implement
+                // their own fog, so this toggle only affects the
+                // standard-material objects (rocks, trees, terrain).
+                scene.traverse(o => { if (o.isMesh && o.material) o.material.needsUpdate = true; });
+                console.log('[perf] Scene fog:', scene.fog ? 'ON' : 'OFF',
+                            '(grass + clouds have their own fog and are unaffected)');
+            }
+            // ── PER-FIELD GRASS TOGGLES (5/6/7) ───────────────────
+            // Splits key 3's "all grass off" into per-field toggles
+            // so we can isolate which of the three fields costs the
+            // most vertex/instance work.
+            if (key === '5' || key === '6' || key === '7') {
+                const fieldName = key === '5' ? 'Grass'
+                                : key === '6' ? 'Wheat'
+                                              : 'Dense Short Grass';
+                const meshes = (window.meadowMeshes || []).filter(m => m.name === fieldName);
+                if (meshes.length === 0) {
+                    console.log('[perf] No mesh named', fieldName, '— meadow may not be loaded yet');
+                } else {
+                    const newVis = !meshes[0].visible;
+                    for (const m of meshes) m.visible = newVis;
+                    console.log('[perf]', fieldName + ':', newVis ? 'ON' : 'OFF',
+                                `(${meshes.length} mesh${meshes.length>1?'es':''})`);
+                }
+            }
         });
 
         document.addEventListener('keyup', e => { 
@@ -7930,6 +8070,9 @@ const s = Math.sin(angle); const c = Math.cos(angle);
                 if (window.settingsOpen) closeSettingsMenu();
                 else if (window.menuOpen) closeCharacterMenu();
                 else openCharacterMenu();
+            } else if (e.key === 'F3' || e.key === '`' || e.key === '~') {
+                e.preventDefault();
+                Perf.toggle();
             } else if (e.key === 'Escape') {
                 if (window.menuOpen) closeCharacterMenu();
                 else if (window.settingsOpen) closeSettingsMenu();
@@ -8544,6 +8687,7 @@ const s = Math.sin(angle); const c = Math.cos(angle);
         
         function animate() {
             requestAnimationFrame(animate);
+            Perf.begin();
             const delta = clock.getDelta();
             const time = clock.getElapsedTime();
 
@@ -8854,6 +8998,7 @@ const s = Math.sin(angle); const c = Math.cos(angle);
             if (window.knightTick) window.knightTick(delta);
 
             renderer.render(scene, camera);
+            Perf.end();
 
             // Direct array iteration — avoids expensive scene.traverse every frame
             for (let mi = 0; mi < monolithMeshes.length; mi++) {
